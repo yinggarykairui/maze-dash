@@ -229,7 +229,9 @@ try {
   var G = {
     maze: null,
     start: 0,
-    exit: 0
+    exit: 0,
+    runner: { from: 0, to: 0, t: 0, heading: E },
+    trail: []
   };
   // One handle for the headless verification harness. Nothing in the game
   // reads it; it exists so a test can assert on real state.
@@ -243,8 +245,83 @@ try {
     G.exit = idx(COLS - 1, randInt(ROWS));
   }
 
+  // ---- the runner ----------------------------------------------------
+  var SPEED = 4.2;                              // cells per second
+  var TRAIL_MAX = reduceMotion ? 10 : 40;
+
+  function neighbour(c, d) { return idx(cx(c) + DX[d], cy(c) + DY[d]); }
+
+  // Open exits from cell c for a runner that arrived heading h, ordered by
+  // turn angle: straight ahead, then right, then left. Reverse is excluded,
+  // so index 0 always means "carry on" and a press is an act of will.
+  function optionsAt(c, h) {
+    var order = [h, (h + 1) & 3, (h + 3) & 3];
+    var out = [];
+    for (var i = 0; i < 3; i++) if (G.maze[c] & bit(order[i])) out.push(order[i]);
+    return out;
+  }
+
+  function pushTrail(c) {
+    G.trail.push(c);
+    if (G.trail.length > TRAIL_MAX) G.trail.shift();
+  }
+
+  // Arrival procedure. Returns true when the cell is the exit; otherwise it
+  // commits a new heading and the next cell.
+  function arrive(c, h) {
+    if (c === G.exit) return true;
+    var opts = optionsAt(c, h);
+    var nh;
+    if (opts.length === 0) nh = opposite(h);        // dead end: reverse in place
+    else if (opts.length === 1) nh = opts[0];       // corridor: forced turn
+    else nh = opts[0];                              // junction: default exit
+    var r = G.runner;
+    r.heading = nh;
+    r.from = c;
+    r.to = neighbour(c, nh);
+    return false;
+  }
+
+  function resetRunner() {
+    var r = G.runner;
+    r.from = G.start; r.to = G.start; r.t = 0; r.heading = E;
+    G.trail.length = 0;
+    pushTrail(G.start);
+    // The start cell is treated as entered from outside through the west
+    // wall: the same arrival code path, with opposite(E) = W excluded.
+    arrive(G.start, E);
+  }
+
+  function onCleared() {
+    newMaze();
+    resetRunner();
+  }
+
+  function stepRunner(dt) {
+    var r = G.runner;
+    r.t += SPEED * dt;
+    var guard = 0;
+    while (r.t >= 1 && guard++ < 20) {
+      r.t -= 1;
+      var landed = r.to;
+      pushTrail(landed);
+      if (arrive(landed, r.heading)) { onCleared(); break; }
+    }
+  }
+
   // ---- drawing -------------------------------------------------------
   function px(x) { return WALL / 2 + x * CELL; }
+  function centreX(c) { return px(cx(c)) + CELL / 2; }
+  function centreY(c) { return px(cy(c)) + CELL / 2; }
+
+  function runnerX() {
+    var r = G.runner;
+    return centreX(r.from) + (centreX(r.to) - centreX(r.from)) * r.t;
+  }
+  function runnerY() {
+    var r = G.runner;
+    return centreY(r.from) + (centreY(r.to) - centreY(r.from)) * r.t;
+  }
 
   function drawWalls() {
     ctx.strokeStyle = INK;
@@ -293,23 +370,70 @@ try {
     ctx.globalAlpha = 1;
   }
 
+  // The trail is what makes a wrong turn legible, so it is not decoration.
+  // Drawn segment by segment because the alpha ramps along its length.
+  function drawTrail() {
+    var pts = [];
+    for (var i = 0; i < G.trail.length; i++) {
+      pts.push(centreX(G.trail[i]), centreY(G.trail[i]));
+    }
+    pts.push(runnerX(), runnerY());
+    var n = pts.length / 2;
+    if (n < 2) return;
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = Math.max(1, CELL * 0.18);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (var s = 0; s < n - 1; s++) {
+      ctx.globalAlpha = 0.35 * ((s + 1) / (n - 1));
+      ctx.beginPath();
+      ctx.moveTo(pts[s * 2], pts[s * 2 + 1]);
+      ctx.lineTo(pts[s * 2 + 2], pts[s * 2 + 3]);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawRunner() {
+    var x = runnerX(), y = runnerY(), r = Math.max(2, CELL * 0.2);
+    ctx.fillStyle = ACCENT;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PAPER;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
   function draw(now) {
     var size = boardPx();
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, size, size);
+    drawTrail();
     drawWalls();
     drawExit(now);
+    drawRunner();
   }
 
   // ---- frame loop ----------------------------------------------------
+  var last = 0;
+
   function frame(now) {
     requestAnimationFrame(frame);
     layoutIfNeeded();
+    var dt = (now - last) / 1000;
+    last = now;
+    if (!(dt > 0)) dt = 0;
+    // Mandatory: a backgrounded tab or a stalled main thread otherwise
+    // delivers a multi-second delta that walks the runner through walls.
+    dt = Math.min(dt, 0.05);
+    stepRunner(dt);
     draw(now);
   }
 
   newMaze();
+  resetRunner();
   layoutIfNeeded();
   requestAnimationFrame(frame);
 })();
