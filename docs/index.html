@@ -293,15 +293,16 @@ try {
   // upcoming junction and its default exit are on screen from the instant the
   // previous one was committed, so the reaction window is the whole corridor.
   function lookahead(c, h) {
-    var cur = neighbour(c, h), hd = h;
+    var cur = neighbour(c, h), hd = h, path = [cur];
     for (var i = 0; i < 400; i++) {
       if (cur === G.exit) return null;
       var o = optionsAt(cur, hd);
       if (o.length >= 2) {
-        return { cell: cur, arrivalHeading: hd, options: o, selIndex: defaultIndex(cur, o) };
+        return { cell: cur, arrivalHeading: hd, options: o, selIndex: defaultIndex(cur, o), path: path };
       }
       hd = (o.length === 0) ? opposite(hd) : o[0];
       cur = neighbour(cur, hd);
+      path.push(cur);
     }
     return null;                                     // cap hit: no arrow
   }
@@ -431,11 +432,24 @@ try {
     ctx.globalAlpha = 1;
   }
 
+  // Paper mixed towards ink by f. Opaque on purpose — see drawTrail.
+  function graphite(f) {
+    return 'rgb(' + Math.round(250 - 223 * f) + ',' +
+                    Math.round(248 - 221 * f) + ',' +
+                    Math.round(244 - 217 * f) + ')';
+  }
+
   // The trail is what makes a wrong turn legible, so it is not decoration.
-  // Stroked as one path, layered: pass k draws the path from point k to the
-  // runner, so the newest segment is painted every pass and the oldest once.
-  // That ramps the alpha from ~0 to 0.35 without the beads that per-segment
-  // alpha leaves at the joins.
+  // Two things it must not do. It must not be amber: the accent belongs to
+  // the runner and its arrow and to nothing else, so amber on the board always
+  // means "you, and the choice in front of you" — a trail in the same hue only
+  // louder was why the arrow read as a darker patch of trail. And it must not
+  // stack: the fade lives in the colour, not in globalAlpha, so where the path
+  // crosses itself the newer segment simply covers the older one instead of
+  // compositing into a dark blot the arrow can no longer be told apart from.
+  // Opaque segments also mean no beads at the round joins, and one stroke per
+  // segment instead of the O(n^2) layered version this replaces.
+  var TRAIL_INK = 0.26;                         // darkest the trail ever gets
   function drawTrail() {
     var pts = [];
     for (var i = 0; i < G.trail.length; i++) {
@@ -444,42 +458,69 @@ try {
     pts.push(runnerX(), runnerY());
     var n = pts.length / 2;
     if (n < 2) return;
-    ctx.strokeStyle = ACCENT;
     ctx.lineWidth = Math.max(1, CELL * 0.18);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = 1 - Math.pow(1 - 0.35, 1 / (n - 1));
     for (var k = 0; k < n - 1; k++) {
+      ctx.strokeStyle = graphite(TRAIL_INK * (k + 1) / (n - 1));
       ctx.beginPath();
       ctx.moveTo(pts[k * 2], pts[k * 2 + 1]);
-      for (var j = k + 1; j < n; j++) ctx.lineTo(pts[j * 2], pts[j * 2 + 1]);
+      ctx.lineTo(pts[k * 2 + 2], pts[k * 2 + 3]);
       ctx.stroke();
     }
+  }
+
+  // The corridor from the runner to the junction the arrow is standing on.
+  // Without it the arrow is a mark up to seven cells away with walls in
+  // between and nothing saying which question it is answering. There are no
+  // choices anywhere along this stretch — it is the route the runner takes on
+  // its own — so it tells the player nothing they could not already work out.
+  function drawTether() {
+    var p = G.pending;
+    if (!p || !p.path || !p.path.length) return;
+    ctx.strokeStyle = ACCENT;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = Math.max(1, CELL * 0.07);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([Math.max(2, CELL * 0.13), Math.max(3, CELL * 0.17)]);
+    ctx.beginPath();
+    ctx.moveTo(runnerX(), runnerY());
+    for (var i = 0; i < p.path.length; i++) {
+      ctx.lineTo(centreX(p.path[i]), centreY(p.path[i]));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.globalAlpha = 1;
   }
 
   // Position and direction carry the meaning; colour is not the only signal.
+  // Full strength, never composited down, and laid on its own paper halo the
+  // way the runner is — that is what keeps it a separate mark rather than a
+  // darker patch of whatever it happens to be standing on.
   function drawArrow() {
     var p = G.pending;
     if (!p || !p.options.length) return;
     var d = p.options[p.selIndex % p.options.length];
     var x0 = centreX(p.cell), y0 = centreY(p.cell);
-    var len = CELL * 0.42;
+    var len = CELL * 0.38;
     var ex = x0 + DX[d] * len, ey = y0 + DY[d] * len;
-    var head = CELL * 0.2;
+    var head = CELL * 0.22;
     var bx = -DX[d] * head, by = -DY[d] * head;      // back along the shaft
     var nx = -DY[d] * head * 0.72, ny = DX[d] * head * 0.72;
-    ctx.strokeStyle = ACCENT;
-    ctx.globalAlpha = 0.85;
-    ctx.lineWidth = Math.max(1.5, CELL * 0.1);
+    var w = Math.max(2.5, CELL * 0.14);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(x0, y0); ctx.lineTo(ex, ey);
     ctx.moveTo(ex, ey); ctx.lineTo(ex + bx + nx, ey + by + ny);
     ctx.moveTo(ex, ey); ctx.lineTo(ex + bx - nx, ey + by - ny);
+    ctx.strokeStyle = PAPER;                          // halo, then the mark
+    ctx.lineWidth = w + Math.max(2, CELL * 0.1);
     ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = w;
+    ctx.stroke();
   }
 
   function drawRunner() {
@@ -501,7 +542,7 @@ try {
     drawTrail();
     drawWalls();
     drawExit(now);
-    if (G.state === 'running') drawArrow();
+    if (G.state === 'running') { drawTether(); drawArrow(); }
     drawRunner();
   }
 
