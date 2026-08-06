@@ -304,7 +304,17 @@ try {
     r.heading = nh;
     r.from = c;
     r.to = neighbour(c, nh);
-    G.pending = lookahead(c, nh);
+    // The lookahead is recomputed on *every* arrival, which includes each
+    // corridor cell between here and the junction the arrow is already on.
+    // When it resolves to the same junction approached from the same side it
+    // is literally the same question, so the player's answer has to carry
+    // forward. Rebuilding it with selIndex 0 silently reverted every press one
+    // cell later and made the one button a no-op.
+    var np = lookahead(c, nh);
+    if (np && p && np.cell === p.cell && np.arrivalHeading === p.arrivalHeading) {
+      np.selIndex = p.selIndex;
+    }
+    G.pending = np;
     return false;
   }
 
