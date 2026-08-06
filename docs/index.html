@@ -231,6 +231,7 @@ try {
     start: 0,
     exit: 0,
     runner: { from: 0, to: 0, t: 0, heading: E },
+    pending: null,
     trail: []
   };
   // One handle for the headless verification harness. Nothing in the game
@@ -266,25 +267,45 @@ try {
     if (G.trail.length > TRAIL_MAX) G.trail.shift();
   }
 
+  // Simulate forward from a fresh commit using forced turns and dead-end
+  // reversals only, until the next real junction. The point is that the
+  // upcoming junction and its default exit are on screen from the instant the
+  // previous one was committed, so the reaction window is the whole corridor.
+  function lookahead(c, h) {
+    var cur = neighbour(c, h), hd = h;
+    for (var i = 0; i < 400; i++) {
+      if (cur === G.exit) return null;
+      var o = optionsAt(cur, hd);
+      if (o.length >= 2) return { cell: cur, arrivalHeading: hd, options: o, selIndex: 0 };
+      hd = (o.length === 0) ? opposite(hd) : o[0];
+      cur = neighbour(cur, hd);
+    }
+    return null;                                     // cap hit: no arrow
+  }
+
   // Arrival procedure. Returns true when the cell is the exit; otherwise it
   // commits a new heading and the next cell.
   function arrive(c, h) {
     if (c === G.exit) return true;
     var opts = optionsAt(c, h);
+    var p = G.pending;
     var nh;
     if (opts.length === 0) nh = opposite(h);        // dead end: reverse in place
     else if (opts.length === 1) nh = opts[0];       // corridor: forced turn
+    else if (p && p.cell === c && p.options.length) nh = p.options[p.selIndex % p.options.length];
     else nh = opts[0];                              // junction: default exit
     var r = G.runner;
     r.heading = nh;
     r.from = c;
     r.to = neighbour(c, nh);
+    G.pending = lookahead(c, nh);
     return false;
   }
 
   function resetRunner() {
     var r = G.runner;
     r.from = G.start; r.to = G.start; r.t = 0; r.heading = E;
+    G.pending = null;
     G.trail.length = 0;
     pushTrail(G.start);
     // The start cell is treated as entered from outside through the west
@@ -394,6 +415,30 @@ try {
     ctx.globalAlpha = 1;
   }
 
+  // Position and direction carry the meaning; colour is not the only signal.
+  function drawArrow() {
+    var p = G.pending;
+    if (!p || !p.options.length) return;
+    var d = p.options[p.selIndex % p.options.length];
+    var x0 = centreX(p.cell), y0 = centreY(p.cell);
+    var len = CELL * 0.42;
+    var ex = x0 + DX[d] * len, ey = y0 + DY[d] * len;
+    var head = CELL * 0.2;
+    var bx = -DX[d] * head, by = -DY[d] * head;      // back along the shaft
+    var nx = -DY[d] * head * 0.72, ny = DX[d] * head * 0.72;
+    ctx.strokeStyle = ACCENT;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = Math.max(1.5, CELL * 0.1);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x0, y0); ctx.lineTo(ex, ey);
+    ctx.moveTo(ex, ey); ctx.lineTo(ex + bx + nx, ey + by + ny);
+    ctx.moveTo(ex, ey); ctx.lineTo(ex + bx - nx, ey + by - ny);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   function drawRunner() {
     var x = runnerX(), y = runnerY(), r = Math.max(2, CELL * 0.2);
     ctx.fillStyle = ACCENT;
@@ -413,8 +458,34 @@ try {
     drawTrail();
     drawWalls();
     drawExit(now);
+    drawArrow();
     drawRunner();
   }
+
+  // ---- input ---------------------------------------------------------
+  // One action, three bindings. A press with no pending junction is a no-op:
+  // it is not queued and not applied to a later junction.
+  function press() {
+    var p = G.pending;
+    if (!p || !p.options.length) return;
+    p.selIndex = (p.selIndex + 1) % p.options.length;
+  }
+
+  window.addEventListener('keydown', function (e) {
+    if (e.key !== ' ' && e.key !== 'Enter') return;
+    if (e.repeat) return;                            // holding does not spin it
+    if (e.key === ' ') e.preventDefault();           // never scroll the page
+    press();
+  });
+
+  function onPointerDown(e) {
+    if (e.isPrimary === false) return;               // a second finger is not a second press
+    e.preventDefault();
+    press();
+  }
+  canvas.addEventListener('pointerdown', onPointerDown);
+  overlay.addEventListener('pointerdown', onPointerDown);
+  actBtn.addEventListener('pointerdown', onPointerDown);
 
   // ---- frame loop ----------------------------------------------------
   var last = 0;
