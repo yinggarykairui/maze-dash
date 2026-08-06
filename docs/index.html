@@ -227,6 +227,12 @@ try {
   }
 
   var G = {
+    state: 'ready',                  // 'ready' | 'running' | 'over'
+    timeLeft: 60,
+    cleared: 0,
+    mazeElapsed: 0,
+    fastestThisRun: null,
+    overAt: 0,
     maze: null,
     start: 0,
     exit: 0,
@@ -314,8 +320,14 @@ try {
   }
 
   function onCleared() {
+    G.cleared++;
+    if (G.fastestThisRun === null || G.mazeElapsed < G.fastestThisRun) {
+      G.fastestThisRun = G.mazeElapsed;
+    }
+    announce('Maze ' + G.cleared + ' cleared.');
     newMaze();
     resetRunner();
+    G.mazeElapsed = 0;               // straight on, no pause and no transition
   }
 
   function stepRunner(dt) {
@@ -458,14 +470,107 @@ try {
     drawTrail();
     drawWalls();
     drawExit(now);
-    drawArrow();
+    if (G.state === 'running') drawArrow();
     drawRunner();
+  }
+
+  // ---- HUD, overlay and announcements --------------------------------
+  function nowMs() {
+    return (window.performance && performance.now) ? performance.now() : Date.now();
+  }
+
+  function announce(msg) { liveEl.textContent = msg; }
+
+  // Stored records (see the localStorage section below).
+  function recordText() { return ''; }
+  function onRunEnd() { return false; }
+
+  function setOverlay(parts) {
+    while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i].text) continue;
+      var d = document.createElement('div');
+      d.className = parts[i].cls;
+      d.textContent = parts[i].text;
+      overlay.appendChild(d);
+    }
+    overlay.removeAttribute('hidden');
+  }
+
+  // #hud is never a live region — updating it per frame would flood a screen
+  // reader — so it is throttled to ~10 Hz and only written when it changes.
+  var lastHudAt = -1e9, lastTimeStr = '', lastClearedStr = '';
+  function syncHud(now, force) {
+    if (!force && now - lastHudAt < 100) return;
+    lastHudAt = now;
+    var t = (G.timeLeft > 0 ? G.timeLeft : 0).toFixed(1);
+    if (t !== lastTimeStr) { lastTimeStr = t; timeEl.textContent = t; }
+    var c = String(G.cleared);
+    if (c !== lastClearedStr) { lastClearedStr = c; clearedEl.textContent = c; }
+  }
+
+  function showTitle() {
+    setOverlay([
+      { cls: 'big', text: 'maze-dash' },
+      { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit.' },
+      { cls: 'rec', text: recordText() }
+    ]);
+    actBtn.textContent = 'Start run';
+  }
+
+  // ---- run loop ------------------------------------------------------
+  function startRun() {
+    G.state = 'running';
+    G.timeLeft = 60;
+    G.cleared = 0;
+    G.mazeElapsed = 0;
+    G.fastestThisRun = null;
+    newMaze();
+    resetRunner();
+    overlay.setAttribute('hidden', '');
+    actBtn.textContent = 'Turn';
+    announce('Run started.');
+    syncHud(nowMs(), true);
+  }
+
+  function endRun() {
+    G.state = 'over';
+    G.timeLeft = 0;
+    G.overAt = nowMs();
+    var fast = G.fastestThisRun;
+    var beaten = onRunEnd();
+    setOverlay([
+      { cls: 'big', text: G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') },
+      { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' },
+      { cls: 'new', text: beaten ? 'new best' : '' }
+    ]);
+    actBtn.textContent = 'Run again';
+    announce('Time up. ' + G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') + ' cleared.' +
+      (fast === null ? '' : ' Fastest maze ' + fast.toFixed(1) + ' seconds.') +
+      (beaten ? ' New best.' : ''));
+    syncHud(nowMs(), true);
+  }
+
+  function update(dt) {
+    // Order is fixed: movement and clears are processed first, then the clock
+    // is applied and tested, so a maze finished on the final frame counts.
+    G.mazeElapsed += dt;
+    stepRunner(dt);
+    G.timeLeft -= dt;
+    if (G.timeLeft <= 0) endRun();
   }
 
   // ---- input ---------------------------------------------------------
   // One action, three bindings. A press with no pending junction is a no-op:
   // it is not queued and not applied to a later junction.
   function press() {
+    if (G.state === 'ready') { startRun(); return; }
+    if (G.state === 'over') {
+      // The press that was in flight when the clock hit zero must not skip
+      // the results screen.
+      if (nowMs() - G.overAt >= 350) startRun();
+      return;
+    }
     var p = G.pending;
     if (!p || !p.options.length) return;
     p.selIndex = (p.selIndex + 1) % p.options.length;
@@ -499,12 +604,14 @@ try {
     // Mandatory: a backgrounded tab or a stalled main thread otherwise
     // delivers a multi-second delta that walks the runner through walls.
     dt = Math.min(dt, 0.05);
-    stepRunner(dt);
+    if (G.state === 'running') update(dt);
     draw(now);
+    syncHud(now, false);
   }
 
   newMaze();
   resetRunner();
+  showTitle();
   layoutIfNeeded();
   requestAnimationFrame(frame);
 })();
