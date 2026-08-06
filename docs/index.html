@@ -47,12 +47,25 @@
     font-variant-numeric: tabular-nums;
     font-size: 0.85rem;
   }
-  #best { opacity: 0.62; min-height: 1.15em; }
+  /* Mazes cleared is the score, so it is the largest thing on the page and
+     the clock is the footnote — the other way round is how the one number
+     that matters ended up in peripheral vision. */
+  #hud { display: flex; align-items: baseline; gap: 0.34em; }
+  #cleared {
+    font-size: 1.7rem;
+    font-weight: 600;
+    line-height: 1;
+    transition: color 120ms ease-out;
+  }
+  #cleared.bump { color: var(--accent); }   /* one beat, in place, on a clear */
+  #hud .unit { font-size: 0.7rem; letter-spacing: 0.06em; opacity: 0.7; }
+  #hud .dot { opacity: 0.35; }
+  #best { opacity: 0.72; min-height: 1.15em; }
   #hint {
     margin: 0;
     font-size: 0.78rem;
     line-height: 1.35;
-    opacity: 0.58;
+    opacity: 0.72;
     text-align: center;
     max-width: 24rem;
   }
@@ -76,23 +89,22 @@
     gap: 0.6em;
     padding: 1rem;
     text-align: center;
-    background: rgba(250, 248, 244, 0.93);
+    /* Thin enough to read the maze through: at 0.93 the board behind was
+       1.14:1 and the cold load looked like a blank card. */
+    background: rgba(250, 248, 244, 0.55);
     touch-action: none;
   }
   #overlay[hidden] { display: none; }
+  /* The maze reads through the scrim now, so the text gets the same paper halo
+     the runner and the arrow get on the canvas. */
+  #overlay > div { text-shadow: 0 0 7px var(--paper), 0 0 3px var(--paper); }
   #overlay .big {
     font-size: 1.35rem;
     letter-spacing: 0.14em;
     text-transform: lowercase;
   }
-  #overlay .sub { font-size: 0.85rem; line-height: 1.4; max-width: 20rem; opacity: 0.75; }
-  #overlay .rec {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
-    opacity: 0.62;
-  }
-  #overlay .new { color: var(--accent); font-size: 0.85rem; letter-spacing: 0.08em; }
+  #overlay .big.new { color: var(--accent); }
+  #overlay .sub { font-size: 0.85rem; line-height: 1.4; max-width: 20rem; }
   #act {
     font: inherit;
     font-size: 0.95rem;
@@ -104,7 +116,12 @@
     border-radius: 999px;
     cursor: pointer;
     touch-action: manipulation;
+    transition: background-color 90ms linear;
   }
+  /* -webkit-tap-highlight-color is off, so the press feedback has to be ours.
+     On a phone this button is the whole UI. */
+  #act:hover { background: rgba(27, 27, 27, 0.05); }
+  #act:active { background: rgba(27, 27, 27, 0.14); }
   #act:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .sr-only {
     position: absolute;
@@ -121,14 +138,14 @@
 <body>
 <main>
   <h1>maze-dash</h1>
-  <p id="hud" aria-hidden="false">time <span id="time">60.0</span> · cleared <span id="cleared">0</span></p>
+  <p id="hud" aria-hidden="false"><span id="cleared">0</span> <span class="unit">cleared</span> <span class="dot">·</span> <span id="time">60.0</span> <span class="unit">s left</span></p>
   <div id="wrap">
     <canvas id="stage" aria-hidden="true"></canvas>
     <div id="overlay"></div>
   </div>
   <button id="act" type="button">Start run</button>
   <p id="best"></p>
-  <p id="hint">Space, Enter, or tap: change the turn ahead.</p>
+  <p id="hint">Press Space, Enter, or tap the maze to start.</p>
   <div id="live" role="status" aria-live="polite" class="sr-only"></div>
 </main>
 <script>
@@ -154,6 +171,7 @@ try {
   var timeEl = document.getElementById('time');
   var clearedEl = document.getElementById('cleared');
   var bestEl = document.getElementById('best');
+  var hintEl = document.getElementById('hint');
   var liveEl = document.getElementById('live');
 
   var reduceMotion = false;
@@ -353,6 +371,7 @@ try {
     if (G.fastestThisRun === null || G.mazeElapsed < G.fastestThisRun) {
       G.fastestThisRun = G.mazeElapsed;
     }
+    bumpCleared();
     announce('Maze ' + G.cleared + ' cleared.');
     newMaze();
     resetRunner();
@@ -553,6 +572,16 @@ try {
 
   function announce(msg) { liveEl.textContent = msg; }
 
+  // Clearing a maze is the only reward the game has, and the board is replaced
+  // in the same frame, so the count itself has to acknowledge it. One beat of
+  // accent on the number, in place — no transition, nothing on the board.
+  var bumpTimer = 0;
+  function bumpCleared() {
+    clearedEl.classList.add('bump');
+    if (bumpTimer) clearTimeout(bumpTimer);
+    bumpTimer = setTimeout(function () { clearedEl.classList.remove('bump'); }, 520);
+  }
+
   // ---- records -------------------------------------------------------
   var KEY = 'maze-dash.best.v1';
 
@@ -588,7 +617,11 @@ try {
     return s;
   }
 
-  function syncBestLine() { bestEl.textContent = recordText(); }
+  // The record line is the all-time number. On a results screen that has just
+  // set it, printing it again would be the same string twice on one page, so
+  // it stands down and lets the overlay speak; when the run did not beat it,
+  // it is the target and it stays.
+  function syncBestLine(suppress) { bestEl.textContent = suppress ? '' : recordText(); }
 
   // Records are written once, at the end of a run — not per maze. A run that
   // beats nothing still rewrites the key, so a corrupt value gets replaced.
@@ -600,7 +633,7 @@ try {
       beaten = true;
     }
     saveBest(best);
-    syncBestLine();
+    syncBestLine(beaten);
     return beaten;
   }
 
@@ -628,13 +661,15 @@ try {
     if (c !== lastClearedStr) { lastClearedStr = c; clearedEl.textContent = c; }
   }
 
+  // Each screen says its own thing once. The title is in the h1, the record is
+  // in #best and the score is in #hud, so none of the three is repeated here,
+  // and the hint under the button says what the button will actually do.
   function showTitle() {
     setOverlay([
-      { cls: 'big', text: 'maze-dash' },
-      { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit.' },
-      { cls: 'rec', text: recordText() }
+      { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit.' }
     ]);
     actBtn.textContent = 'Start run';
+    hintEl.textContent = 'Press Space, Enter, or tap the maze to start.';
   }
 
   // ---- run loop ------------------------------------------------------
@@ -646,8 +681,10 @@ try {
     G.fastestThisRun = null;
     newMaze();
     resetRunner();
+    syncBestLine(false);
     overlay.setAttribute('hidden', '');
     actBtn.textContent = 'Turn';
+    hintEl.textContent = 'Space, Enter, or tap: move the arrow to the next exit.';
     announce('Run started.');
     syncHud(nowMs(), true);
   }
@@ -659,11 +696,11 @@ try {
     var fast = G.fastestThisRun;
     var beaten = onRunEnd();
     setOverlay([
-      { cls: 'big', text: G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') },
-      { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' },
-      { cls: 'new', text: beaten ? 'new best' : '' }
+      { cls: beaten ? 'big new' : 'big', text: beaten ? 'new best' : 'time up' },
+      { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' }
     ]);
     actBtn.textContent = 'Run again';
+    hintEl.textContent = 'Press Space, Enter, or tap to run again.';
     announce('Time up. ' + G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') + ' cleared.' +
       (fast === null ? '' : ' Fastest maze ' + fast.toFixed(1) + ' seconds.') +
       (beaten ? ' New best.' : ''));
@@ -704,7 +741,11 @@ try {
 
   function onPointerDown(e) {
     if (e.isPrimary === false) return;               // a second finger is not a second press
+    // preventDefault stops the tap selecting text or double-tap-zooming, but
+    // it also cancels the focus the button would have taken for itself, which
+    // left document.activeElement on BODY after every mouse click. Restore it.
     e.preventDefault();
+    if (e.currentTarget === actBtn) { try { actBtn.focus(); } catch (err) { /* no-op */ } }
     press();
   }
   canvas.addEventListener('pointerdown', onPointerDown);
@@ -730,7 +771,7 @@ try {
 
   newMaze();
   resetRunner();
-  syncBestLine();
+  syncBestLine(false);
   showTitle();
   layoutIfNeeded();
   requestAnimationFrame(frame);
@@ -742,6 +783,15 @@ try {
       o.removeAttribute('hidden');
       o.textContent = 'Something went wrong loading the game.';
     }
+    // Every affordance on the page is now a lie: there is no run to start, no
+    // clock counting and no turn to change. Take them away rather than leave
+    // a Start button that does nothing.
+    var a = document.getElementById('act');
+    if (a) a.hidden = true;
+    var hd = document.getElementById('hud');
+    if (hd) hd.hidden = true;
+    var h = document.getElementById('hint');
+    if (h) h.textContent = 'Try reloading the page.';
   } catch (e2) { /* nothing left to do */ }
   if (window.console && console.error) console.error(err);
 }
