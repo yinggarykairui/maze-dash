@@ -12,6 +12,14 @@
     --accent: #b0430c; /* 5.4:1 on paper */
   }
   * { box-sizing: border-box; }
+  /* The boot guard hides #hud and #act to take away affordances that would be
+     lies after a failed boot. Any element with its own `display` rule beats
+     the UA sheet's `[hidden] { display: none }` on specificity, so `hidden`
+     silently did nothing to #hud (display: flex) and the dead HUD kept
+     counting "60.0 s left" above the failure sentence. One rule, applied to
+     every element, so the next `display` rule added to this file cannot
+     re-open the hole. */
+  [hidden] { display: none !important; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--paper);
@@ -118,7 +126,6 @@
     background: rgba(250, 248, 244, 0.55);
     touch-action: none;
   }
-  #overlay[hidden] { display: none; }
   /* The maze reads through the scrim now, so the text gets the same paper halo
      the runner and the arrow get on the canvas. */
   #overlay > div { text-shadow: 0 0 7px var(--paper), 0 0 3px var(--paper); }
@@ -214,15 +221,44 @@ try {
   try { sideCols = window.matchMedia('(orientation: landscape) and (max-height: 520px)'); }
   catch (e) { sideCols = null; }
 
+  // #hint says a different sentence on each of the three screens, and at
+  // 320-340px wide one of them wraps to two lines where the others fit on one.
+  // Measuring the sentence that happens to be showing therefore moved the
+  // board 13px the instant you pressed Start. Reserve the tallest of the three
+  // instead, so the measurement is a property of the layout and not of the
+  // screen. Kept in one object so the copy and the reserve cannot drift apart.
+  var HINTS = {
+    ready: 'Press Space, Enter, or tap the maze to start.',
+    running: 'Space, Enter, or tap: move the arrow to the next exit.',
+    over: 'Press Space, Enter, or tap to run again.'
+  };
+  var hintReserve = 0, hintReserveW = -1;
+  function hintPx() {
+    var w = hintEl.clientWidth, h = hintEl.offsetHeight;
+    // Recomputed on a width change, and again if the live sentence ever
+    // outgrows the reserve (text-only zoom, a fallback font landing late).
+    if (w === hintReserveW && h <= hintReserve) return hintReserve;
+    var keep = hintEl.textContent, max = 0;
+    // No paint happens inside a synchronous block, so this is invisible.
+    for (var k in HINTS) {
+      hintEl.textContent = HINTS[k];
+      if (hintEl.offsetHeight > max) max = hintEl.offsetHeight;
+    }
+    hintEl.textContent = keep;
+    hintReserveW = w;
+    hintReserve = Math.max(max, h);
+    return hintReserve;
+  }
+
   // Everything the board is not. Measured rather than assumed: a hard-coded
   // budget does not follow the h1, HUD, button and hint when the page is
   // zoomed, and it was the reason 200% zoom made the playfield *smaller*.
   function chromePx() {
     if (sideCols && sideCols.matches) return PAD;   // it is beside the board, not above it
-    var els = [h1El, hudEl, actBtn, bestEl, hintEl];
-    var h = 0;
+    var els = [h1El, hudEl, actBtn, bestEl];
+    var h = hintPx();
     for (var i = 0; i < els.length; i++) h += els[i] ? els[i].offsetHeight : 0;
-    return h + GAP * els.length + PAD;
+    return h + GAP * (els.length + 1) + PAD;
   }
 
   function layoutIfNeeded() {
@@ -721,7 +757,7 @@ try {
       { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit.' }
     ]);
     actBtn.textContent = 'Start run';
-    hintEl.textContent = 'Press Space, Enter, or tap the maze to start.';
+    hintEl.textContent = HINTS.ready;
   }
 
   // ---- run loop ------------------------------------------------------
@@ -736,7 +772,7 @@ try {
     syncBestLine(false);
     overlay.setAttribute('hidden', '');
     actBtn.textContent = 'Turn';
-    hintEl.textContent = 'Space, Enter, or tap: move the arrow to the next exit.';
+    hintEl.textContent = HINTS.running;
     announce('Run started.');
     syncHud(nowMs(), true);
   }
@@ -752,7 +788,7 @@ try {
       { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' }
     ]);
     actBtn.textContent = 'Run again';
-    hintEl.textContent = 'Press Space, Enter, or tap to run again.';
+    hintEl.textContent = HINTS.over;
     announce('Time up. ' + G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') + ' cleared.' +
       (fast === null ? '' : ' Fastest maze ' + fast.toFixed(1) + ' seconds.') +
       (beaten ? ' New best.' : ''));
