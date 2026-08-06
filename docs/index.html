@@ -234,6 +234,7 @@ try {
     fastestThisRun: null,
     overAt: 0,
     maze: null,
+    taken: null,                     // exits already used, per cell, this maze
     start: 0,
     exit: 0,
     runner: { from: 0, to: 0, t: 0, heading: E },
@@ -246,6 +247,7 @@ try {
 
   function newMaze() {
     G.maze = carve();
+    G.taken = new Uint8Array(COLS * ROWS);
     // Entrance and exit are rendering-only notches in the outer wall: the
     // wall data is untouched and the runner starts inside the start cell.
     G.start = idx(0, randInt(ROWS));
@@ -268,6 +270,19 @@ try {
     return out;
   }
 
+  // The default exit at a junction is the one closest to straight ahead that
+  // the runner has not already taken out of that cell in this maze. Without
+  // the tie-break the no-input policy is a pure function of (cell, heading),
+  // so on a loop-free maze the runner falls into a short cycle and orbits it
+  // for the whole run — it looks frozen, and a player who steers toward the
+  // exit loops too, because reversing out of a dead end returns to the same
+  // junction and the same answer. It stays fully deterministic and the arrow
+  // still shows exactly the exit that will be taken.
+  function defaultIndex(c, o) {
+    for (var i = 0; i < o.length; i++) if (!(G.taken[c] & bit(o[i]))) return i;
+    return 0;
+  }
+
   function pushTrail(c) {
     G.trail.push(c);
     if (G.trail.length > TRAIL_MAX) G.trail.shift();
@@ -282,7 +297,9 @@ try {
     for (var i = 0; i < 400; i++) {
       if (cur === G.exit) return null;
       var o = optionsAt(cur, hd);
-      if (o.length >= 2) return { cell: cur, arrivalHeading: hd, options: o, selIndex: 0 };
+      if (o.length >= 2) {
+        return { cell: cur, arrivalHeading: hd, options: o, selIndex: defaultIndex(cur, o) };
+      }
       hd = (o.length === 0) ? opposite(hd) : o[0];
       cur = neighbour(cur, hd);
     }
@@ -299,7 +316,8 @@ try {
     if (opts.length === 0) nh = opposite(h);        // dead end: reverse in place
     else if (opts.length === 1) nh = opts[0];       // corridor: forced turn
     else if (p && p.cell === c && p.options.length) nh = p.options[p.selIndex % p.options.length];
-    else nh = opts[0];                              // junction: default exit
+    else nh = opts[defaultIndex(c, opts)];          // junction: default exit
+    G.taken[c] |= bit(nh);
     var r = G.runner;
     r.heading = nh;
     r.from = c;
