@@ -185,21 +185,131 @@ try {
 
   function boardPx() { return CELL * COLS + WALL; }
 
+  // ---- maze ----------------------------------------------------------
+  // Directions in clockwise order. Bit flags mark *open* passages.
+  var N = 0, E = 1, S = 2, W = 3;
+  var DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  function bit(d) { return 1 << d; }
+  function opposite(d) { return (d + 2) & 3; }
+  function idx(x, y) { return y * COLS + x; }
+  function cx(i) { return i % COLS; }
+  function cy(i) { return (i / COLS) | 0; }
+  function randInt(n) { return Math.floor(Math.random() * n); }
+
+  // Iterative randomized depth-first search (recursive backtracker) with an
+  // explicit stack. It visits all 169 cells and carves exactly one edge per
+  // newly visited cell, so the result is a spanning tree: a perfect maze with
+  // exactly one path between any two cells. No solvability check is needed.
+  function carve() {
+    var cells = new Uint8Array(COLS * ROWS);
+    var seen = new Uint8Array(COLS * ROWS);
+    var stack = [idx(randInt(COLS), randInt(ROWS))];
+    seen[stack[0]] = 1;
+    var nbrs = [0, 0, 0, 0];
+    while (stack.length) {
+      var c = stack[stack.length - 1];
+      var x = cx(c), y = cy(c), n = 0;
+      for (var d = 0; d < 4; d++) {
+        var nx = x + DX[d], ny = y + DY[d];
+        if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+        if (seen[idx(nx, ny)]) continue;
+        nbrs[n++] = d;
+      }
+      if (n === 0) { stack.pop(); continue; }
+      var pick = nbrs[randInt(n)];
+      var next = idx(x + DX[pick], y + DY[pick]);
+      cells[c] |= bit(pick);
+      cells[next] |= bit(opposite(pick));
+      seen[next] = 1;
+      stack.push(next);
+    }
+    return cells;
+  }
+
+  var G = {
+    maze: null,
+    start: 0,
+    exit: 0
+  };
+  // One handle for the headless verification harness. Nothing in the game
+  // reads it; it exists so a test can assert on real state.
+  window.__mazeDash = G;
+
+  function newMaze() {
+    G.maze = carve();
+    // Entrance and exit are rendering-only notches in the outer wall: the
+    // wall data is untouched and the runner starts inside the start cell.
+    G.start = idx(0, randInt(ROWS));
+    G.exit = idx(COLS - 1, randInt(ROWS));
+  }
+
   // ---- drawing -------------------------------------------------------
-  function draw() {
+  function px(x) { return WALL / 2 + x * CELL; }
+
+  function drawWalls() {
+    ctx.strokeStyle = INK;
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = WALL;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    var m = G.maze;
+    var startY = cy(G.start), exitY = cy(G.exit);
+    for (var y = 0; y < ROWS; y++) {
+      for (var x = 0; x < COLS; x++) {
+        var c = m[idx(x, y)];
+        var left = px(x), top = px(y), right = px(x + 1), bottom = px(y + 1);
+        if (!(c & bit(N))) { ctx.moveTo(left, top); ctx.lineTo(right, top); }
+        // The entrance is the missing west edge of the start cell.
+        if (!(c & bit(W)) && !(x === 0 && y === startY)) {
+          ctx.moveTo(left, top); ctx.lineTo(left, bottom);
+        }
+        if (y === ROWS - 1 && !(c & bit(S))) { ctx.moveTo(left, bottom); ctx.lineTo(right, bottom); }
+        // The exit is the missing east edge of the exit cell.
+        if (x === COLS - 1 && !(c & bit(E)) && y !== exitY) {
+          ctx.moveTo(right, top); ctx.lineTo(right, bottom);
+        }
+      }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawExit(now) {
+    var c = G.exit;
+    var mx = px(cx(c)) + CELL / 2, my = px(cy(c)) + CELL / 2;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = WALL;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(mx, my, CELL * 0.28, 0, Math.PI * 2);
+    ctx.stroke();
+    if (!reduceMotion) {
+      var breathe = CELL * (0.36 + 0.09 * Math.sin(now / 620));
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(mx, my, breathe, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function draw(now) {
     var size = boardPx();
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, size, size);
+    drawWalls();
+    drawExit(now);
   }
 
   // ---- frame loop ----------------------------------------------------
-  function frame() {
+  function frame(now) {
     requestAnimationFrame(frame);
     layoutIfNeeded();
-    draw();
+    draw(now);
   }
 
+  newMaze();
   layoutIfNeeded();
   requestAnimationFrame(frame);
 })();
