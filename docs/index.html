@@ -622,6 +622,7 @@ try {
   // accent on the number, in place — no transition, nothing on the board.
   var bumpTimer = 0;
   function bumpCleared() {
+    syncHud(nowMs(), true);          // the beat has to land on the new number
     clearedEl.classList.add('bump');
     if (bumpTimer) clearTimeout(bumpTimer);
     bumpTimer = setTimeout(function () { clearedEl.classList.remove('bump'); }, 520);
