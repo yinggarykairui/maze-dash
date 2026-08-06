@@ -300,8 +300,10 @@ try {
     pending: null,
     trail: []
   };
-  // One handle for the headless verification harness. Nothing in the game
-  // reads it; it exists so a test can assert on real state.
+  // Kept on purpose, and it is the only line in the file that exists for
+  // something other than the player: it is what let three reviewers measure
+  // the real mechanic instead of reading the source and believing it, and one
+  // of them found a blocker that way. Nothing in the game reads it back.
   window.__mazeDash = G;
 
   function newMaze() {
@@ -473,22 +475,24 @@ try {
     ctx.globalAlpha = 1;
   }
 
+  // A filled core with a ring breathing well clear of it. At phone width the
+  // old r=0.28 ring and its r=0.36..0.45 breath were close enough to merge
+  // into one fuzzy doughnut, and the goal had no identity of its own.
   function drawExit(now) {
     var c = G.exit;
     var mx = px(cx(c)) + CELL / 2, my = px(cy(c)) + CELL / 2;
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = WALL;
+    ctx.fillStyle = INK;
     ctx.globalAlpha = 0.9;
     ctx.beginPath();
-    ctx.arc(mx, my, CELL * 0.28, 0, Math.PI * 2);
+    ctx.arc(mx, my, Math.max(2, CELL * 0.15), 0, Math.PI * 2);
+    ctx.fill();
+    var r = reduceMotion ? CELL * 0.4 : CELL * (0.38 + 0.08 * Math.sin(now / 620));
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = WALL;
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, Math.PI * 2);
     ctx.stroke();
-    if (!reduceMotion) {
-      var breathe = CELL * (0.36 + 0.09 * Math.sin(now / 620));
-      ctx.globalAlpha = 0.35;
-      ctx.beginPath();
-      ctx.arc(mx, my, breathe, 0, Math.PI * 2);
-      ctx.stroke();
-    }
     ctx.globalAlpha = 1;
   }
 
@@ -637,10 +641,16 @@ try {
       var o = JSON.parse(raw);                      // can throw: any garbage
       if (!o || typeof o !== 'object') return emptyBest();
       var c = Number(o.cleared), f = Number(o.fastest);
-      return {
-        cleared: Number.isFinite(c) && c >= 0 && c < 1e6 ? Math.floor(c) : 0,
-        fastest: Number.isFinite(f) && f > 0 && f <= 60 ? f : null
-      };
+      var okC = Number.isFinite(c) && c >= 0 && c < 1e6;
+      var okF = Number.isFinite(f) && f > 0 && f <= 60;
+      c = okC ? Math.floor(c) : -1;
+      f = okF ? f : null;
+      // A record is one fact, not two independently sanitised ones: you cannot
+      // clear mazes without a fastest maze, or have a fastest maze without
+      // clearing one. Sanitising the fields apart is what printed the
+      // self-contradictory "best 0 mazes · fastest 60.00s".
+      if (c < 0 || (c > 0) !== (f !== null)) return emptyBest();
+      return { cleared: c, fastest: f };
     } catch (e) { return emptyBest(); }
   }
 
@@ -749,6 +759,11 @@ try {
   }
 
   function update(dt) {
+    // The last frame of a run is only as long as the clock has left. Charging
+    // a whole frame regardless is how a maze cleared on that frame could be
+    // recorded at 60.02s — an in-session "fastest" that loadBest() then threw
+    // away on the next reload for being over 60.
+    if (dt > G.timeLeft) dt = G.timeLeft;
     // Order is fixed: movement and clears are processed first, then the clock
     // is applied and tested, so a maze finished on the final frame counts.
     G.mazeElapsed += dt;
