@@ -404,7 +404,10 @@ try {
   }
 
   // The trail is what makes a wrong turn legible, so it is not decoration.
-  // Drawn segment by segment because the alpha ramps along its length.
+  // Stroked as one path, layered: pass k draws the path from point k to the
+  // runner, so the newest segment is painted every pass and the oldest once.
+  // That ramps the alpha from ~0 to 0.35 without the beads that per-segment
+  // alpha leaves at the joins.
   function drawTrail() {
     var pts = [];
     for (var i = 0; i < G.trail.length; i++) {
@@ -417,11 +420,11 @@ try {
     ctx.lineWidth = Math.max(1, CELL * 0.18);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    for (var s = 0; s < n - 1; s++) {
-      ctx.globalAlpha = 0.35 * ((s + 1) / (n - 1));
+    ctx.globalAlpha = 1 - Math.pow(1 - 0.35, 1 / (n - 1));
+    for (var k = 0; k < n - 1; k++) {
       ctx.beginPath();
-      ctx.moveTo(pts[s * 2], pts[s * 2 + 1]);
-      ctx.lineTo(pts[s * 2 + 2], pts[s * 2 + 3]);
+      ctx.moveTo(pts[k * 2], pts[k * 2 + 1]);
+      for (var j = k + 1; j < n; j++) ctx.lineTo(pts[j * 2], pts[j * 2 + 1]);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
