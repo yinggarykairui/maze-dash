@@ -193,6 +193,20 @@
 // maze-dash — the whole program. One file, no dependencies, no build step.
 // Everything is inside this try/catch: a throw at boot must degrade to a
 // sentence, never to a blank page.
+
+// The nodes the failure path needs, resolved before the guarded block starts.
+// document.getElementById is part of the failure surface too, and when it was
+// the thing that threw, the recovery path's own lookups threw with it: the
+// second throw landed in the inner catch and the page kept a frozen HUD and a
+// Start button that did nothing, with no sentence saying why. Each node is
+// resolved here through two independent APIs, so a break in either one still
+// leaves the catch below reading variables it already holds.
+function bootNode(id) {
+  try { var el = document.getElementById(id); if (el) return el; } catch (e) { /* fall through */ }
+  try { return document.querySelector('#' + id); } catch (e) { return null; }
+}
+var bootOverlay = bootNode('overlay'), bootAct = bootNode('act'),
+    bootHud = bootNode('hud'), bootHint = bootNode('hint');
 try {
 (function () {
   'use strict';
@@ -926,20 +940,16 @@ try {
 })();
 } catch (err) {
   try {
-    var o = document.getElementById('overlay');
-    if (o) {
-      o.removeAttribute('hidden');
-      o.textContent = 'Something went wrong loading the game.';
+    if (bootOverlay) {
+      bootOverlay.removeAttribute('hidden');
+      bootOverlay.textContent = 'Something went wrong loading the game.';
     }
     // Every affordance on the page is now a lie: there is no run to start, no
     // clock counting and no turn to change. Take them away rather than leave
     // a Start button that does nothing.
-    var a = document.getElementById('act');
-    if (a) a.hidden = true;
-    var hd = document.getElementById('hud');
-    if (hd) hd.hidden = true;
-    var h = document.getElementById('hint');
-    if (h) h.textContent = 'Try reloading the page.';
+    if (bootAct) bootAct.hidden = true;
+    if (bootHud) bootHud.hidden = true;
+    if (bootHint) bootHint.textContent = 'Try reloading the page.';
   } catch (e2) { /* nothing left to do */ }
   if (window.console && console.error) console.error(err);
 }
