@@ -818,7 +818,20 @@ try {
 
   // Records are written once, at the end of a run — not per maze. A run that
   // beats nothing still rewrites the key, so a corrupt value gets replaced.
+  //
+  // `best` is a snapshot taken at boot, and two tabs share one key: writing the
+  // snapshot back whole is how a tab that booted at 7 mazes erased another
+  // tab's 99. So the stored record is re-read here and merged in before the run
+  // is judged against it, and each field only ever moves the good way. A stored
+  // blob that fails validation reads as no record, exactly as it does at boot,
+  // and is overwritten. This is a merge on write and nothing more: a tab still
+  // shows the record it booted with until its own run ends.
   function onRunEnd() {
+    var stored = loadBest();
+    if (stored.cleared > best.cleared) best.cleared = stored.cleared;
+    if (stored.fastest !== null && (best.fastest === null || stored.fastest < best.fastest)) {
+      best.fastest = stored.fastest;
+    }
     var beaten = false;
     if (G.cleared > best.cleared) { best.cleared = G.cleared; beaten = true; }
     if (G.fastestThisRun !== null && (best.fastest === null || G.fastestThisRun < best.fastest)) {
