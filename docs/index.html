@@ -604,10 +604,14 @@ try {
   // Opaque segments also mean no beads at the round joins, instead of the
   // O(n^2) layered version this replaces.
   // The ramp runs from TRAIL_FAINT up to TRAIL_INK rather than up from nothing.
-  // A ramp that starts at zero spends its faint end below reading: from 0.26
-  // down to 0, five of the twelve bands — the oldest seventeen of the forty
-  // segments — are drawn under 1.25:1, and that stretch is not information
-  // whatever TRAIL_MAX says.
+  // The alternative is a ramp from 0 to TRAIL_INK, and it spends its faint end
+  // below reading: band centres there start at f 0.021, so three of the twelve
+  // bands — the oldest nine of the thirty-nine segments — come out at 1.05:1,
+  // 1.13:1 and 1.23:1, under 1.25:1 and not information whatever TRAIL_MAX
+  // says. Name the ramp when you quote these: counting the same bands over
+  // 0 to 0.26 instead gives five bands and sixteen segments, and an earlier
+  // version of this comment that left the ramp implicit was derived both ways
+  // and was wrong both times.
   // These two are the ends of the ramp, not colours anything is ever drawn in:
   // drawTrail quantises into bands and strokes each band at its *centre*, so
   // the darkest band on screen is f 0.49 and the faintest is f 0.27. The
@@ -645,17 +649,20 @@ try {
   }
 
   // The corridor from the runner to the junction the arrow is standing on.
-  // Without it the arrow is a mark up to seven cells away with walls in
-  // between and nothing saying which question it is answering. There are no
-  // choices anywhere along this stretch — it is the route the runner takes on
-  // its own — so it tells the player nothing they could not already work out.
+  // Without it the arrow is a mark with walls in between and nothing saying
+  // which question it is answering, and the corridor between them is long: over
+  // 21,581 sampled frames the path ran to 57 cells at the 99th percentile and
+  // 76 at the longest. There are no choices anywhere along this stretch — it is
+  // the route the runner takes on its own — so it tells the player nothing they
+  // could not already work out.
   function drawTether() {
     var p = G.pending;
     if (!p || !p.path || !p.path.length) return;
     // A junction one cell away needs no tether: there is nothing between the
     // runner and the arrow to be ambiguous about, and a dashed line across
     // that gap is exactly what welded the two amber marks into one glyph with
-    // a tail. 35% of frames are at that distance, so this is the common case.
+    // a tail. 17% of sampled frames are at that distance — common, not the
+    // majority the 35% this line used to claim would have made it.
     if (p.path.length <= 1) return;
     // 0.45 put the dashes at rgb(217,167,140) = 2.02:1 on paper, which at CELL
     // 25 and below is a rumour rather than a line, and this line is the whole
