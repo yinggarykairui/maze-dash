@@ -66,7 +66,9 @@
     transition: color 120ms ease-out;
   }
   #cleared.bump { color: var(--accent); }   /* one beat, in place, on a clear */
-  #hud .unit { font-size: 0.7rem; letter-spacing: 0.06em; opacity: 0.7; }
+  /* At 180px the HUD wraps, and without this it wrapped *inside* the unit and
+     left the word "left" alone on a line of its own. */
+  #hud .unit { font-size: 0.7rem; letter-spacing: 0.06em; opacity: 0.7; white-space: nowrap; }
   #hud .dot { opacity: 0.35; }
   #best { opacity: 0.72; min-height: 1.15em; }
   #hint {
@@ -126,9 +128,17 @@
     background: rgba(250, 248, 244, 0.55);
     touch-action: none;
   }
-  /* The maze reads through the scrim now, so the text gets the same paper halo
-     the runner and the arrow get on the canvas. */
-  #overlay > div { text-shadow: 0 0 7px var(--paper), 0 0 3px var(--paper); }
+  /* The scrim stays thin so the board still reads as a maze on a cold load,
+     which means wall strokes at 12:1 run straight through the glyphs. A blur
+     halo does not survive that — it softens the stroke where it crosses a
+     letter instead of removing it. Each line gets its own near-opaque paper
+     card sized to the text, so the copy sits on paper and the board is still
+     visible around it. */
+  #overlay > div {
+    background: rgba(250, 248, 244, 0.94);
+    padding: 0.28em 0.62em;
+    border-radius: 3px;
+  }
   #overlay .big {
     font-size: 1.35rem;
     letter-spacing: 0.14em;
@@ -355,7 +365,12 @@ try {
 
   // ---- the runner ----------------------------------------------------
   var SPEED = 5.5;                              // cells per second
-  var TRAIL_MAX = reduceMotion ? 10 : 40;
+  // How far back the trail is drawn. Measured, not guessed: a whole-maze trail
+  // scored *worse* than this one for every policy tested, because once most of
+  // the board is grey "have I been here" stops discriminating. A window of
+  // about seven seconds is what answers the question the player is actually
+  // asking at a junction — "did I just come from there".
+  var TRAIL_MAX = 40;
 
   function neighbour(c, d) { return idx(cx(c) + DX[d], cy(c) + DY[d]); }
 
@@ -559,7 +574,13 @@ try {
   // compositing into a dark blot the arrow can no longer be told apart from.
   // Opaque segments also mean no beads at the round joins, and one stroke per
   // segment instead of the O(n^2) layered version this replaces.
-  var TRAIL_INK = 0.26;                         // darkest the trail ever gets
+  // The ramp runs from TRAIL_FAINT up to TRAIL_INK rather than up from nothing.
+  // A ramp that starts at zero turns a forty-cell trail into a fifteen-cell
+  // one: at 0.26 down to 0 only the newest third was drawn above 1.25:1, and
+  // the rest was not information whatever TRAIL_MAX said.
+  var TRAIL_INK = 0.50;                         // newest segment: 3.27:1 on paper
+  var TRAIL_FAINT = 0.26;                       // oldest still on screen: 1.74:1
+  var TRAIL_BANDS = 12;                         // colour steps; see the batching note
   function drawTrail() {
     var pts = [];
     for (var i = 0; i < G.trail.length; i++) {
@@ -571,11 +592,19 @@ try {
     ctx.lineWidth = Math.max(1, CELL * 0.18);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    for (var k = 0; k < n - 1; k++) {
-      ctx.strokeStyle = graphite(TRAIL_INK * (k + 1) / (n - 1));
+    // Segments are quantised into bands and each band is drawn as one path,
+    // oldest first, so a newer segment still covers an older one where the walk
+    // crosses itself. Twelve steps is below where the ramp shows banding at
+    // these levels, and it is twelve strokes a frame instead of forty.
+    var span = TRAIL_INK - TRAIL_FAINT;
+    for (var band = 0; band < TRAIL_BANDS; band++) {
+      var lo = Math.floor((n - 1) * band / TRAIL_BANDS);
+      var hi = Math.floor((n - 1) * (band + 1) / TRAIL_BANDS);
+      if (hi <= lo) continue;
+      ctx.strokeStyle = graphite(TRAIL_FAINT + span * (band + 0.5) / TRAIL_BANDS);
       ctx.beginPath();
-      ctx.moveTo(pts[k * 2], pts[k * 2 + 1]);
-      ctx.lineTo(pts[k * 2 + 2], pts[k * 2 + 3]);
+      ctx.moveTo(pts[lo * 2], pts[lo * 2 + 1]);
+      for (var k = lo; k < hi; k++) ctx.lineTo(pts[k * 2 + 2], pts[k * 2 + 3]);
       ctx.stroke();
     }
   }
@@ -588,8 +617,17 @@ try {
   function drawTether() {
     var p = G.pending;
     if (!p || !p.path || !p.path.length) return;
+    // A junction one cell away needs no tether: there is nothing between the
+    // runner and the arrow to be ambiguous about, and a dashed line across
+    // that gap is exactly what welded the two amber marks into one glyph with
+    // a tail. 35% of frames are at that distance, so this is the common case.
+    if (p.path.length <= 1) return;
+    // 0.45 put the dashes at rgb(217,167,140) = 2.02:1 on paper, which at CELL
+    // 25 and below is a rumour rather than a line, and this line is the whole
+    // answer to "which junction does that arrow belong to". 0.8 is 3.79:1 and
+    // still visibly weaker than the full-strength arrow it points at.
     ctx.strokeStyle = ACCENT;
-    ctx.globalAlpha = 0.45;
+    ctx.globalAlpha = 0.8;
     ctx.lineWidth = Math.max(1, CELL * 0.07);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -626,22 +664,26 @@ try {
     ctx.moveTo(ex, ey); ctx.lineTo(ex + bx + nx, ey + by + ny);
     ctx.moveTo(ex, ey); ctx.lineTo(ex + bx - nx, ey + by - ny);
     ctx.strokeStyle = PAPER;                          // halo, then the mark
-    ctx.lineWidth = w + Math.max(2, CELL * 0.1);
+    ctx.lineWidth = w + Math.max(2.5, CELL * 0.12);
     ctx.stroke();
     ctx.strokeStyle = ACCENT;
     ctx.lineWidth = w;
     ctx.stroke();
   }
 
+  // Stroked first and filled second, so the halo is all *outside* the disc and
+  // the runner keeps its full radius. A 1px ring was enough against paper and
+  // not enough against a trail the runner is by definition standing on: the
+  // ring is what separates the two amber marks when the arrow is next door.
   function drawRunner() {
     var x = runnerX(), y = runnerY(), r = Math.max(2, CELL * 0.2);
-    ctx.fillStyle = ACCENT;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
     ctx.strokeStyle = PAPER;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = Math.max(2, CELL * 0.11);
     ctx.stroke();
+    ctx.fillStyle = ACCENT;
+    ctx.fill();
   }
 
   function draw(now) {
@@ -764,7 +806,7 @@ try {
   // and the hint under the button says what the button will actually do.
   function showTitle() {
     setOverlay([
-      { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit.' }
+      { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit; the grey trail behind it is everywhere you have already been.' }
     ]);
     actBtn.textContent = 'Start run';
     hintEl.textContent = HINTS.ready;
