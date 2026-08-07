@@ -604,9 +604,10 @@ try {
   // Opaque segments also mean no beads at the round joins, instead of the
   // O(n^2) layered version this replaces.
   // The ramp runs from TRAIL_FAINT up to TRAIL_INK rather than up from nothing.
-  // A ramp that starts at zero turns a forty-cell trail into a fifteen-cell
-  // one: at 0.26 down to 0 only the newest third was drawn above 1.25:1, and
-  // the rest was not information whatever TRAIL_MAX said.
+  // A ramp that starts at zero spends its faint end below reading: from 0.26
+  // down to 0, five of the twelve bands — the oldest seventeen of the forty
+  // segments — are drawn under 1.25:1, and that stretch is not information
+  // whatever TRAIL_MAX says.
   // These two are the ends of the ramp, not colours anything is ever drawn in:
   // drawTrail quantises into bands and strokes each band at its *centre*, so
   // the darkest band on screen is f 0.49 and the faintest is f 0.27. The
