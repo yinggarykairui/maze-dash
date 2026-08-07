@@ -369,7 +369,10 @@ try {
   // scored *worse* than this one for every policy tested, because once most of
   // the board is grey "have I been here" stops discriminating. A window of
   // about seven seconds is what answers the question the player is actually
-  // asking at a junction — "did I just come from there".
+  // asking at a junction — "did I just come from there". It no longer forks on
+  // prefers-reduced-motion either: a static line is not motion, and the ten
+  // cells that branch used to allow was under two seconds of memory in a game
+  // whose whole skill is memory.
   var TRAIL_MAX = 40;
 
   function neighbour(c, d) { return idx(cx(c) + DX[d], cy(c) + DY[d]); }
@@ -572,8 +575,8 @@ try {
   // stack: the fade lives in the colour, not in globalAlpha, so where the path
   // crosses itself the newer segment simply covers the older one instead of
   // compositing into a dark blot the arrow can no longer be told apart from.
-  // Opaque segments also mean no beads at the round joins, and one stroke per
-  // segment instead of the O(n^2) layered version this replaces.
+  // Opaque segments also mean no beads at the round joins, instead of the
+  // O(n^2) layered version this replaces.
   // The ramp runs from TRAIL_FAINT up to TRAIL_INK rather than up from nothing.
   // A ramp that starts at zero turns a forty-cell trail into a fifteen-cell
   // one: at 0.26 down to 0 only the newest third was drawn above 1.25:1, and
