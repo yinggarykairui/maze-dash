@@ -116,11 +116,17 @@
     left: 50%;
     transform: translateX(-50%);
     height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    /* One column, and no gap. Flex sized each card to its own sentence, so the
+       results screen showed two cards 61px apart in width with 0.6em of board
+       between them — enough to frame a stray wall stub, paper above it and
+       paper below. Grid gives them one shared column, sized by fit-content to
+       the wider card and to no more than the overlay itself at 360px, which is
+       where flex used to shrink to; both cards stretch to that column. With
+       the gap closed the pair is one unbroken sheet. */
+    display: grid;
+    grid-template-columns: fit-content(100%);
+    align-content: center;
     justify-content: center;
-    gap: 0.6em;
     padding: 1rem;
     text-align: center;
     /* Thin enough to read the maze through: at 0.93 the board behind was
