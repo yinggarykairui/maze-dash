@@ -743,24 +743,43 @@ try {
 
   function emptyBest() { return { cleared: 0, fastest: null }; }
 
-  // Never let a stored value break the page. Everything here is defensive on
-  // purpose: a bad parse at load time is how a page ships blank.
+  // The floor under any honest "fastest maze". The exit is always in the last
+  // column and the runner always starts in the first, so it covers at least
+  // COLS - 1 cells at SPEED cells per second, and mazeElapsed is charged the
+  // whole frame that lands the clear. 12 / 5.5 = 2.18s: nothing under that was
+  // played, whatever the stored blob says.
+  var MIN_MAZE_SECONDS = (COLS - 1) / SPEED;
+
+  // Type first, then range. Number() is not a validator — it coerces the type
+  // away: "1e3" came back as 1000 mazes, true as one maze in 1.00s, [4] as
+  // four. The bounds stay as wide as they already were; it is the typeof that
+  // does the work.
+  function isCount(x) {
+    return typeof x === 'number' && Number.isInteger(x) && x >= 0 && x < 1e6;
+  }
+  // NaN and Infinity fail both comparisons, so no separate finiteness test.
+  function isTime(x) {
+    return typeof x === 'number' && x >= MIN_MAZE_SECONDS && x <= 60;
+  }
+
+  // Never let a stored value break the page, and never let one lie either: a
+  // record that fails any of these tests reads as no record at all, exactly
+  // like a missing key. Silently rewriting it into a wrong-but-plausible
+  // number is worse than admitting there is nothing to show.
   function loadBest() {
     try {
       var raw = localStorage.getItem(KEY);          // can throw: private mode
       if (!raw) return emptyBest();
       var o = JSON.parse(raw);                      // can throw: any garbage
       if (!o || typeof o !== 'object') return emptyBest();
-      var c = Number(o.cleared), f = Number(o.fastest);
-      var okC = Number.isFinite(c) && c >= 0 && c < 1e6;
-      var okF = Number.isFinite(f) && f > 0 && f <= 60;
-      c = okC ? Math.floor(c) : -1;
-      f = okF ? f : null;
+      var c = o.cleared, f = (o.fastest === undefined) ? null : o.fastest;
+      if (!isCount(c)) return emptyBest();
+      if (f !== null && !isTime(f)) return emptyBest();
       // A record is one fact, not two independently sanitised ones: you cannot
       // clear mazes without a fastest maze, or have a fastest maze without
       // clearing one. Sanitising the fields apart is what printed the
       // self-contradictory "best 0 mazes · fastest 60.00s".
-      if (c < 0 || (c > 0) !== (f !== null)) return emptyBest();
+      if ((c > 0) !== (f !== null)) return emptyBest();
       return { cleared: c, fastest: f };
     } catch (e) { return emptyBest(); }
   }
