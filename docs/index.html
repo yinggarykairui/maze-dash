@@ -211,6 +211,12 @@ function bootNode(id) {
   try { var el = document.getElementById(id); if (el) return el; } catch (e) { /* fall through */ }
   try { return document.querySelector('#' + id); } catch (e) { return null; }
 }
+// One statement of the recovery below, run on its own. A null node or a
+// poisoned DOM method takes down this step and nothing after it: the recovery
+// is a list of independent repairs, not a chain where the first throw ends it.
+function bootStep(fn) {
+  try { fn(); return true; } catch (e) { return false; }
+}
 var bootOverlay = bootNode('overlay'), bootAct = bootNode('act'),
     bootHud = bootNode('hud'), bootHint = bootNode('hint');
 try {
@@ -969,18 +975,23 @@ try {
   requestAnimationFrame(frame);
 })();
 } catch (err) {
-  try {
-    if (bootOverlay) {
-      bootOverlay.removeAttribute('hidden');
-      bootOverlay.textContent = 'Something went wrong loading the game.';
-    }
-    // Every affordance on the page is now a lie: there is no run to start, no
-    // clock counting and no turn to change. Take them away rather than leave
-    // a Start button that does nothing.
-    if (bootAct) bootAct.hidden = true;
-    if (bootHud) bootHud.hidden = true;
-    if (bootHint) bootHint.textContent = 'Try reloading the page.';
-  } catch (e2) { /* nothing left to do */ }
+  // Every affordance on the page is now a lie: there is no run to start, no
+  // clock counting and no turn to change. Take them away rather than leave a
+  // Start button that does nothing.
+  //
+  // The order of these steps is load-bearing and must not be shuffled. The
+  // ones that take affordances away run first and the one that reveals the
+  // overlay runs last, so a recovery that is itself half-broken stops at an
+  // inert page rather than at a playable-looking one. The sentence is written
+  // into the overlay before the overlay is shown, for the same reason: an
+  // empty card, or the title copy the last successful statement left there,
+  // is not a failure message.
+  bootStep(function () { bootAct.hidden = true; });
+  bootStep(function () { bootHud.hidden = true; });
+  bootStep(function () { bootHint.textContent = 'Try reloading the page.'; });
+  if (bootStep(function () { bootOverlay.textContent = 'Something went wrong loading the game.'; })) {
+    bootStep(function () { bootOverlay.removeAttribute('hidden'); });
+  }
   if (window.console && console.error) console.error(err);
 }
 </script>
