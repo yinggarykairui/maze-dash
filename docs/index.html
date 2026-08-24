@@ -275,11 +275,35 @@ try {
   // open, else straight, else left. Reverse is never an option here, so those
   // three are the whole list.
   //
-  // Its rendered height is not free, and it was chosen by measurement, not by
-  // taste: swept against 805f36c at every viewport width from 180 to 1400 px,
-  // this sentence renders exactly as tall as that build's hint reserve at every
-  // one of them, so CELL is unchanged everywhere. Rewording it is a layout
-  // change — re-run the sweep, do not eyeball it.
+  // The rule is the one that pays, and that is measured, not assumed. Policy
+  // applied at the frame each junction first appears, through the real keydown
+  // handler, on a fake clock stepped at a fixed 16.667ms; Math.random replaced
+  // by mulberry32; seeds 1000-1059, one 60-second run per seed, n = 60 runs
+  // per policy:
+  //
+  //   nearest-right (this rule)   1.833 mazes/run    0 of 60 scoreless runs
+  //   hands-off, never pressing   1.050 mazes/run   19 of 60 scoreless
+  //   straight at the ring        0.150 mazes/run   51 of 60 scoreless
+  //
+  // Wall-following is the only one of the three that never scores zero, which
+  // is the point: a perfect maze is a tree, so one wall runs past every cell.
+  // Steering at the ring is worse than not playing, because the direct line
+  // walks into dead ends — that policy is the control here, and a harness that
+  // does not reproduce it below hands-off is measuring the wrong thing. Issue
+  // #45's day-013 table (2.60 / 1.00 / 0.72, real keys at human cadence) is a
+  // different measurement of the same ordering, not this one; do not quote its
+  // figures as if they came from here.
+  //
+  // Its rendered height is not free, and the sentence was chosen by measuring
+  // it, not by taste. #hint is the only thing chromePx() measures that the copy
+  // can lengthen, and a hint line is 16.85px of line box — offsetHeight steps
+  // 17, 34, 51 — which is not small: swept against 805f36c over 314
+  // (width, height) pairs in two screen states, one extra line took CELL down
+  // by 1 at 84 of the 628 comparisons and by 2 at 48 more — 13 to 26px off the
+  // board, at every viewport where height is the binding constraint. This
+  // sentence renders exactly as tall as 805f36c's hint reserve at every
+  // viewport width from 180 to 1400px, so that same sweep now differs nowhere.
+  // Rewording it is a layout change: re-run the sweep, do not eyeball it.
   var HINT = 'Space, Enter, tap. Keep to the exit nearest your right.';
 
   // With one sentence there is nothing to reserve: the hint's height is just
@@ -599,20 +623,32 @@ try {
   // fifth of a second. A full-board wash is unmistakably not a game object, so
   // it borrows nothing from the accent's "you, and the choice in front of you"
   // rule.
-  // 0.14 is the peak, and it is bounded on both sides. Below it the wash stops
-  // being visible: over paper (250,248,244) the accent's (176,67,12) moves the
-  // blue channel 232 at full strength, so 0.14 moves it 32.5 and lands the
-  // board on (240,223,212). Above it the walls start to go: a wall stroke is
-  // INK at 0.9, rgb(49,49,49) on paper, 12.24:1; washed at 0.14 it is
-  // rgb(67,52,44) against washed paper, still 9.19:1. 200ms with a squared
-  // falloff is over before the runner has crossed 1.1 cells at SPEED 5.5.
+  // 0.14 is the peak, and it is bounded on both sides. Every number below is a
+  // rendered pixel, not an intention: sampled with getImageData on a 600x600
+  // viewport at dpr 1 (CELL 31), over the 3,000 board pixels that are still
+  // exactly paper three frames after the wash has gone, on the clearing frame
+  // itself — the frame where drawFlash clamps a negative age to full strength.
+  // Below 0.14 the wash stops being visible: over paper (250,248,244) the
+  // accent's (176,67,12) moves the blue channel 232 at full strength, so 0.14
+  // moves it 32.5 and the board renders (239,222,211) — 33 off on blue. Above
+  // it the walls start to go: a wall stroke is INK at 0.9, and renders
+  // (49,49,48) on paper, 12.277:1; washed at 0.14 it renders (67,51,43)
+  // against washed paper, still 9.192:1. Half the blue is back by the frame at
+  // 65ms and the board is exactly (250,248,244) again by the frame at 182ms,
+  // inside the 200ms the falloff nominally runs for and before the runner has
+  // crossed 1.1 cells at SPEED 5.5.
   // Drawn under the tether, arrow and runner on purpose: the accent is the
   // runner's own hue, and a wash laid over the two amber marks would tint them
   // towards the paper they are meant to stand out from. Under them, they are
   // untouched — the board moves and the marks do not.
-  // reduceMotion does not fork here. A colour that fades is not motion; the
-  // only thing on this canvas that forks is the exit ring's breath, which is
-  // a moving edge.
+  // reduceMotion does not fork here, and that is derived rather than asserted.
+  // Rate: a clear cannot come faster than MIN_MAZE_SECONDS = (COLS-1)/SPEED =
+  // 2.1818s apart, so the wash tops out at 0.458 Hz — an order of magnitude
+  // under the 3 Hz general-flash threshold, and that is the ceiling, not an
+  // average. Depth: the step is (250,248,244) -> (239,222,211), L* 97.63 ->
+  // 89.53, delta-L* 8.1 over 200ms. A colour that fades by eight L* points at
+  // half a hertz is not motion; the only thing on this canvas that is, and the
+  // only thing that forks, is the exit ring's breath, which is a moving edge.
   var FLASH_MS = 200, FLASH_ALPHA = 0.14;
   function drawFlash(now) {
     var e = now - G.flashAt;
@@ -754,13 +790,31 @@ try {
   // shaft and arm is the end of this budget, not a step in it.
   //
   // It is exact at every CELL from 25 up, where neither 2.5px minimum binds:
-  // 0.38*C + (0.14*C + 0.10*C)/2 = 0.50*C, the half-cell, identically. Below 25
-  // the minimums take over and the mark still overruns by 1.25 - 0.05*C, which
-  // is 0.05px at CELL 24 and 1.18px at the CELL 11 floor — where both minimums
-  // bind, these two constants do nothing at all, and only smaller minimums
-  // could move it. Measured on rendered pixels over a trail-grey field, since
-  // a paper halo on paper leaves nothing to measure: 22.5px before, 22.0px
-  // after, at CELL 44.
+  // 0.38*C + (0.14*C + 0.10*C)/2 = 0.50*C, the half-cell, identically. Below
+  // that the two minimums bind one at a time, so there are two regimes and not
+  // one. Both, because a single formula here quoted the wrong regime's number
+  // underneath itself:
+  //
+  //   C >= 25            w and halo both scale        overrun 0, exactly
+  //   17.857 <= C < 25   halo pinned at 2.5           overrun = 1.25 - 0.05*C
+  //                                                   0.36px at C 17.86,
+  //                                                   0.05px at C 24
+  //   C < 17.857         w pinned at 2.5 as well      overrun = 2.5 - 0.12*C
+  //                                                   1.18px at the C 11 floor
+  //
+  // They meet at C = 17.857, where 0.14*C is 2.5 and both give 0.357. Below
+  // there these two constants do nothing at all, and only smaller minimums
+  // could move it.
+  //
+  // Rendered check, since a paper halo on paper leaves nothing to measure:
+  // this function run over both geometries on a #7f7f7f field, canvas 600x600
+  // at dpr 1, CELL 44, arrow pointing east out of a real junction centre
+  // px(6) + CELL/2 = 287. Painted extent read as the far edge of the furthest
+  // non-background pixel: 23.0px before, 22.0px after. That convention is the
+  // one the 22.00 above is in. Read instead as that pixel's centre it is 22.5
+  // before and 21.5 after — half a pixel less, both times, which is how a pair
+  // of numbers from one convention each got quoted here once. The analytic
+  // pair is 22.44 and 22.00.
   function drawArrow() {
     var p = G.pending;
     if (!p || !p.options.length) return;
