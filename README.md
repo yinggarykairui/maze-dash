@@ -2,7 +2,7 @@
 
 A one-button maze runner: the runner never stops, and the only thing you do is choose which way it turns.
 
-![A 13 by 13 maze in thin black lines on off-white paper. A grey trail winds through the top half of the board, doubling back on itself several times, darkest where the runner has just been and fading out towards its oldest end. The amber runner sits against the right-hand wall at the dark end of that trail. A dashed amber line traces the corridor ahead of it, up and to the left and then back down to the right, ending at an amber arrow that points downward. A small ringed cell sits against the right-hand wall near the bottom. The HUD above reads 1 cleared and 31.9 seconds left, and the button below says Turn.](screenshot.png)
+![A 13 by 13 maze in thin dark lines on off-white paper. A grey trail loops through the top half of the board and doubles back on itself several times; it is darkest where the runner is and fades almost to paper at its oldest end. The amber runner is a filled dot at that dark end, above and to the right of the middle of the board. A dashed amber line runs down from the runner, steps right, drops a little further and runs left, ending at an amber arrow in the middle of the board that points up. A small ringed cell sits against the right-hand wall about four fifths of the way down. The HUD above the board reads 1 cleared and 30.2 s left, the button below it says Turn, and the hint under the button reads: Space, Enter, tap. Keep to the exit nearest your right.](screenshot.png)
 
 **[Live demo](https://yinggarykairui.github.io/maze-dash/)**
 
