@@ -192,7 +192,7 @@
   </div>
   <button id="act" type="button">Start run</button>
   <p id="best"></p>
-  <p id="hint">Space, Enter, tap. Keep to the exit nearest your right.</p>
+  <p id="hint">Space, Enter, or tap: move the arrow to the next exit.</p>
   <div id="live" role="status" aria-live="polite" class="sr-only"></div>
 </main>
 <script>
@@ -257,54 +257,70 @@ try {
   try { sideCols = window.matchMedia('(orientation: landscape) and (max-height: 520px)'); }
   catch (e) { sideCols = null; }
 
-  // One sentence, and every screen shows it. It has to name the control,
-  // because the ready and over screens named none and a stranger could not
-  // start without guessing; and it has to name the rule that pays, because
-  // nothing on the board hints at it. Saying both things once is also what
-  // stops the board moving: #hint is the only thing chromePx() measures whose
-  // height depends on which screen is up, so per-screen copy makes the board a
-  // function of the wording. Three sentences meant reserving the tallest of
-  // them, and the moment one of them wrapped to a second line at a width where
-  // the others did not, every board bound by height shrank. One sentence has no
-  // tallest, nothing to reserve, and nothing that can drift.
+  // Two surfaces, and which sentence goes on which one is decided by height,
+  // not by taste. #hint sits in chromePx(), so every line it wraps to comes
+  // out of the board. #overlay does not: it is position:absolute inside
+  // #wrap, its content never feeds hintPx(), and it costs zero board pixels
+  // at any viewport. So the hint carries the control — the one thing that is
+  // true on all three screens and has to be readable while playing — and the
+  // strategy, which is longer than any height budget here can hold, goes on
+  // an overlay card where length is free.
   //
-  // The rule names its fallback ordering, because "turn the same way" names no
-  // action at the junctions where the same-way exit is not open — a third of
-  // arrivals — and a rule you cannot execute a third of the time is not a rule.
-  // "The exit nearest your right" always names exactly one: right if it is
-  // open, else straight, else left. Reverse is never an option here, so those
-  // three are the whole list.
+  // Cramming control, rule and trap into this one line is what broke twice.
+  // A sentence squeezed into a height budget stops saying which way is
+  // "right": "keep to the exit nearest your right" is second person, so to a
+  // stranger the right is the reader's, which is screen-right — the runner is
+  // drawn as one orientation-free arc() and nothing on the board offers its
+  // frame instead. Measured below, that reading is the worst of the four
+  // policies in the table, worse even than never pressing at all.
   //
-  // The rule is the one that pays, and that is measured, not assumed. Policy
-  // applied at the frame each junction first appears, through the real keydown
-  // handler, on a fake clock stepped at a fixed 16.667ms; Math.random replaced
-  // by mulberry32; seeds 1000-1059, one 60-second run per seed, n = 60 runs
-  // per policy:
+  // This string is byte-identical to 805f36c's `running` hint, and that is
+  // deliberate: 805f36c reserved the tallest of three sentences, and this one
+  // was the tallest at every width, so a single hint of exactly this text
+  // makes hintPx() return the same reserve base did. Swept against 805f36c's
+  // reserve over widths 170 to 1400 in steps of 10 — 124 widths — with
+  // #hint.offsetHeight compared against max(offsetHeight) over base's three
+  // sentences: 0 widths taller, 0 widths shorter. Rewording this is a layout
+  // change; re-run that sweep, do not eyeball it.
+  var HINT = 'Space, Enter, or tap: move the arrow to the next exit.';
+
+  // The strategy. It lives on the overlay because it does not fit here, and
+  // it names its frame of reference twice — "the runner's right", "as it
+  // arrives" — because the frame is the whole defect: the runner is one arc()
+  // with no facing, so nothing on the board supplies a frame and the copy has
+  // to. The heading it arrives with is on screen either way: the dashed
+  // tether's last segment when the junction is more than one cell off, and
+  // the runner's own motion when it is not.
   //
-  //   nearest-right (this rule)   1.833 mazes/run    0 of 60 scoreless runs
-  //   hands-off, never pressing   1.050 mazes/run   19 of 60 scoreless
-  //   straight at the ring        0.150 mazes/run   51 of 60 scoreless
+  // The fallback stops at straight on purpose. "else left" was measured, not
+  // assumed, and it never fires: a junction offers at least two of {straight,
+  // right, left}, so if right is shut straight is open. 0 of 18,539 junction
+  // arrivals sampled across the 300 bot runs below had neither.
   //
-  // Wall-following is the only one of the three that never scores zero, which
-  // is the point: a perfect maze is a tree, so one wall runs past every cell.
-  // Steering at the ring is worse than not playing, because the direct line
-  // walks into dead ends — that policy is the control here, and a harness that
-  // does not reproduce it below hands-off is measuring the wrong thing. Issue
-  // #45's day-013 table (2.60 / 1.00 / 0.72, real keys at human cadence) is a
-  // different measurement of the same ordering, not this one; do not quote its
-  // figures as if they came from here.
+  // That this is the rule that pays is measured too. Protocol, because three
+  // harnesses disagreed until they matched it: one fresh page per run with
+  // Math.random replaced by mulberry32 and the seed installed in an init
+  // script that runs *before* the page's own script, so the maze drawn at
+  // load consumes the same stream a real first run does. Reusing a page and
+  // reseeding after boot returns 0.750 to 0.883 for hands-off instead of the
+  // 1.050 below. Virtual rAF clock stepped at a fixed 16.667ms; policy
+  // applied through the real keydown handler; seeds 1000-1059, one 60-second
+  // run per seed, n = 60 runs per policy:
   //
-  // Its rendered height is not free, and the sentence was chosen by measuring
-  // it, not by taste. #hint is the only thing chromePx() measures that the copy
-  // can lengthen, and a hint line is 16.85px of line box — offsetHeight steps
-  // 17, 34, 51 — which is not small: swept against 805f36c over 314
-  // (width, height) pairs in two screen states, one extra line took CELL down
-  // by 1 at 84 of the 628 comparisons and by 2 at 48 more — 13 to 26px off the
-  // board, at every viewport where height is the binding constraint. This
-  // sentence renders exactly as tall as 805f36c's hint reserve at every
-  // viewport width from 180 to 1400px, so that same sweep now differs nowhere.
-  // Rewording it is a layout change: re-run the sweep, do not eyeball it.
-  var HINT = 'Space, Enter, tap. Keep to the exit nearest your right.';
+  //   this card's rule, read literally   1.833 mazes/run    0 of 60 scoreless
+  //   hands-off, never pressing          1.050 mazes/run   19 of 60 scoreless
+  //   the reader's right = screen-east   0.217 mazes/run   48 of 60 scoreless
+  //   straight at the ring               0.150 mazes/run   51 of 60 scoreless
+  //
+  // The rule is the only one of the four that never scores zero, which is the
+  // point: a perfect maze is a tree, so one wall runs past every cell. The
+  // last two are the controls — a harness that does not put both of them
+  // below hands-off is measuring the wrong thing — and the third row is what
+  // the line shipped at cb9f00c actually told a stranger to do. Issue #45's
+  // day-013 table (2.60 / 1.00 / 0.72, real keys at human cadence) is a
+  // different measurement of the same ordering, not this one; do not quote
+  // its figures as if they came from here.
+  var RULE = "At each junction take the exit on the runner's right as it arrives, or the one ahead if there is none. Steering straight for the ring dead-ends.";
 
   // With one sentence there is nothing to reserve: the hint's height is just
   // this element's height, and it cannot change without the width changing.
@@ -1007,11 +1023,28 @@ try {
   }
 
   // Each screen says its own thing once. The title is in the h1, the record is
-  // in #best and the score is in #hud, so none of the three is repeated here,
-  // and the hint under the button says what the button will actually do.
+  // in #best, the score is in #hud, and the hint under the button says what
+  // the button will actually do — on all three screens, this one included,
+  // which is why this card no longer says it too. What is left here is the
+  // one fact no other surface carries: the arrow is not on the runner, it is
+  // on a junction the runner has not reached yet (a median 5 cells off).
+  //
+  // The rule gets a card of its own rather than a clause bolted to the
+  // sentence above it. Cards cost no board pixels — #overlay is absolutely
+  // positioned and never feeds hintPx(), measured over 350 (width, height)
+  // pairs in each of two screen states; see the RULE comment.
+  //
+  // Card length is not free of *everything*, though: #overlay centres its
+  // content, so a stack taller than the board hangs off both ends and the
+  // bottom half lengthens the page. Held under 805f36c's own worst-case
+  // page overflow at every viewport, which at 320x320 leaves this pair of
+  // cards a 404.59px content budget and 47px of slack, and at 180x320 a
+  // 436.59px budget and 79px. Lengthening either card is a layout change
+  // too, just a different one from lengthening the hint.
   function showTitle() {
     setOverlay([
-      { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit.' }
+      { cls: 'sub', text: 'The runner never stops. The arrow is on the junction ahead.' },
+      { cls: 'sub', text: RULE }
     ]);
     actBtn.textContent = 'Start run';
   }
@@ -1050,7 +1083,8 @@ try {
       : 'time up';
     setOverlay([
       { cls: beaten ? 'big new' : 'big', text: headline },
-      { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' }
+      { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' },
+      { cls: 'sub', text: RULE }
     ]);
     actBtn.textContent = 'Run again';
     announce('Time up. ' + G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') + ' cleared.' +
