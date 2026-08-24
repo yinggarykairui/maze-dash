@@ -1064,12 +1064,27 @@ try {
   // ---- input ---------------------------------------------------------
   // One action, three bindings. A press with no pending junction is a no-op:
   // it is not queued and not applied to a later junction.
+  // How long the results screen is protected from the press you were already
+  // making. It is a constant, not a mechanic: presses inside it are dropped,
+  // never queued, so the run that starts is one you asked for after reading
+  // the score. 350ms was too short to be that — measured on the shipped build
+  // with a fake clock stepped at 16.667ms, a single press was ignored at 300ms
+  // and accepted at 340ms, and mashing the button at an ordinary 450ms cadence
+  // through the buzzer restarted the run on the first press after it, 450ms in,
+  // with 300ms and 600ms cadences landing at 600ms. That is under the time it
+  // takes to read a two-line results card. At 1000ms the same mash lands on the
+  // third press at 1350ms (450ms cadence), the fourth at 1200ms (300ms), the
+  // second at 1200ms (600ms), and the worst case over any cadence is the
+  // constant itself: the score is on screen for at least a second. Re-measured
+  // on this value the same way, a single press is ignored at a nominal 950ms
+  // and accepted at 990ms — a press lands on the next frame boundary, so the
+  // real edge is the constant and the 40ms of slop is the frame step.
+  var RESTART_GUARD_MS = 1000;
+
   function press() {
     if (G.state === 'ready') { startRun(); return; }
     if (G.state === 'over') {
-      // The press that was in flight when the clock hit zero must not skip
-      // the results screen.
-      if (nowMs() - G.overAt >= 350) startRun();
+      if (nowMs() - G.overAt >= RESTART_GUARD_MS) startRun();
       return;
     }
     var p = G.pending;
