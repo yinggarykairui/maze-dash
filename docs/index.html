@@ -962,10 +962,19 @@ try {
     return s;
   }
 
-  // The record line is the all-time number. On a results screen that has just
-  // set it, printing it again would be the same string twice on one page, so
-  // it stands down and lets the overlay speak; when the run did not beat it,
-  // it is the target and it stays.
+  // The record line is the all-time number, and it stands down on exactly one
+  // screen: the results of a run that beat *both* halves of it. There the
+  // overlay already prints this run's count and its fastest maze, and those
+  // two numbers are now the record, so #best would be the same pair again.
+  //
+  // It used to stand down whenever *either* half moved, and that was wrong in
+  // the two cases where the halves disagree, which are the cases the headline
+  // exists to tell apart. Beat the count only, and the record's fastest maze
+  // is a better time than this run's — blanking it left this run's slower
+  // time alone on the page in the position the record used to occupy. Beat
+  // the fastest maze only, and the record's count is higher than this run's —
+  // blanking it hid the very number the headline had just said was not
+  // beaten. Both times the screen deleted the record it was talking about.
   function syncBestLine(suppress) { bestEl.textContent = suppress ? '' : recordText(); }
 
   // Records are written once, at the end of a run — not per maze. A run that
@@ -994,7 +1003,7 @@ try {
       beat.fast = true;
     }
     saveBest(best);
-    syncBestLine(beat.count || beat.fast);
+    syncBestLine(beat.count && beat.fast);   // only a both-halves run repeats itself; see syncBestLine
     return beat;
   }
 
@@ -1081,9 +1090,22 @@ try {
     var headline = beaten
       ? (beat.count && beat.fast ? 'best run yet' : beat.count ? 'most mazes yet' : 'fastest maze yet')
       : 'time up';
+    // The card under the headline reports *this run*, and it is written to
+    // continue the headline rather than restate it. "fastest maze yet" over
+    // "fastest maze 5.00s" said the same two words twice and read as a
+    // stutter; "fastest maze yet" over "in 5.00s" is one sentence. And when
+    // the count is the news, the count has to be on the card: a card whose
+    // only number was the fastest maze put the wrong record under the
+    // headline. The standing record is on #best in both of those cases now.
+    var mazes = G.cleared + (G.cleared === 1 ? ' maze' : ' mazes');
+    var sub;
+    if (fast === null) sub = 'No maze cleared this run.';
+    else if (beat.count) sub = mazes + ', fastest ' + fast.toFixed(2) + 's';
+    else if (beat.fast) sub = 'in ' + fast.toFixed(2) + 's';
+    else sub = 'fastest maze ' + fast.toFixed(2) + 's';
     setOverlay([
       { cls: beaten ? 'big new' : 'big', text: headline },
-      { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' },
+      { cls: 'sub', text: sub },
       { cls: 'sub', text: RULE }
     ]);
     actBtn.textContent = 'Run again';
