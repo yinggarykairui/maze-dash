@@ -371,7 +371,8 @@ try {
     exit: 0,
     runner: { from: 0, to: 0, t: 0, heading: E },
     pending: null,
-    trail: []
+    trail: [],
+    flashAt: -1e9              // when the last clear happened; see drawFlash
   };
   // Kept on purpose, and it is the only line in the file that exists for
   // something other than the player: it is what let three reviewers measure
@@ -504,6 +505,7 @@ try {
     if (G.fastestThisRun === null || G.mazeElapsed < G.fastestThisRun) {
       G.fastestThisRun = G.mazeElapsed;
     }
+    G.flashAt = nowMs();             // the board's half of the reward; see drawFlash
     bumpCleared();
     announce('Maze ' + G.cleared + ' cleared.');
     newMaze();
@@ -584,6 +586,46 @@ try {
     ctx.arc(mx, my, r, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 1;
+  }
+
+  // The other half of the clear beat, put where the eye already is. The
+  // #cleared numeral is 308.6px above the board's centre at 1280x800 — about
+  // 7.8 degrees of eccentricity, parafoveal, where colour discrimination is
+  // already degraded — so the only acknowledgement the game had was outside
+  // the place the player was looking, and the board wipe read as a reset.
+  // The whole board washes towards the accent instead. Not the old exit ring:
+  // the board underneath is already the *next* maze with its ring somewhere
+  // else, so amber at a stale location would be a second goal marker for a
+  // fifth of a second. A full-board wash is unmistakably not a game object, so
+  // it borrows nothing from the accent's "you, and the choice in front of you"
+  // rule.
+  // 0.14 is the peak, and it is bounded on both sides. Below it the wash stops
+  // being visible: over paper (250,248,244) the accent's (176,67,12) moves the
+  // blue channel 232 at full strength, so 0.14 moves it 32.5 and lands the
+  // board on (240,223,212). Above it the walls start to go: a wall stroke is
+  // INK at 0.9, rgb(49,49,49) on paper, 12.24:1; washed at 0.14 it is
+  // rgb(67,52,44) against washed paper, still 9.19:1. 200ms with a squared
+  // falloff is over before the runner has crossed 1.1 cells at SPEED 5.5.
+  // Drawn under the tether, arrow and runner on purpose: the accent is the
+  // runner's own hue, and a wash laid over the two amber marks would tint them
+  // towards the paper they are meant to stand out from. Under them, they are
+  // untouched — the board moves and the marks do not.
+  // reduceMotion does not fork here. A colour that fades is not motion; the
+  // only thing on this canvas that forks is the exit ring's breath, which is
+  // a moving edge.
+  var FLASH_MS = 200, FLASH_ALPHA = 0.14;
+  function drawFlash(now) {
+    var e = now - G.flashAt;
+    if (e >= FLASH_MS) return;
+    // onCleared reads the clock after this frame's rAF timestamp was taken, so
+    // the clearing frame itself arrives here with a slightly negative age. It
+    // is the frame the player sees the new maze on, and it gets full strength.
+    if (e < 0) e = 0;
+    var k = 1 - e / FLASH_MS;
+    ctx.globalAlpha = FLASH_ALPHA * k * k;
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(0, 0, boardPx(), boardPx());
+    ctx.globalAlpha = 1;             // drawTrail inherits whatever is left here
   }
 
   // Paper mixed towards ink by f. Opaque on purpose — see drawTrail.
@@ -736,6 +778,7 @@ try {
     drawTrail();
     drawWalls();
     drawExit(now);
+    drawFlash(now);
     if (G.state === 'running') { drawTether(); drawArrow(); }
     drawRunner();
   }
@@ -893,6 +936,7 @@ try {
     G.cleared = 0;
     G.mazeElapsed = 0;
     G.fastestThisRun = null;
+    G.flashAt = -1e9;
     newMaze();
     resetRunner();
     syncBestLine(false);
