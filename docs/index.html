@@ -751,6 +751,37 @@ try {
   // Full strength, never composited down, and laid on its own paper halo the
   // way the runner is — that is what keeps it a separate mark rather than a
   // darker patch of whatever it happens to be standing on.
+  //
+  // The arrow's whole geometry budget, spent once, so nobody re-derives it.
+  // Everything it paints has to stay inside the junction's own half-cell —
+  // CELL/2, 22.00px at CELL 44 — or the paper halo is laid across the wall
+  // stroke that same cell is drawn with. At CELL 44, from the junction centre:
+  //
+  //   shaft to the tip     0.38*CELL                     = 16.72
+  //   round cap on the halo  (w + halo)/2                =  5.28
+  //                          w    = 0.14*CELL = 6.16
+  //                          halo = 0.10*CELL = 4.40
+  //   painted extent       16.72 + 5.28                  = 22.00  <= 22.00
+  //   shaft behind the head  16.72 - 0.19*CELL           =  8.36
+  //   head arm               0.19*CELL                   =  8.36
+  //
+  // It was head 0.22 and halo 0.12, which put the painted extent at 22.44 —
+  // already over the half-cell — and left 7.04px of shaft behind a 9.68px arm,
+  // which is why the mark read as a chevron rather than an arrow. The shaft is
+  // the thing that cannot move: lengthening it drags the halo further across
+  // the wall, and moving the tail back behind the centre takes the arrow off
+  // the junction it belongs to. So the 1.32px of visible shaft came out of the
+  // head and the halo instead, and it buys the overrun back on the way. Equal
+  // shaft and arm is the end of this budget, not a step in it.
+  //
+  // It is exact at every CELL from 25 up, where neither 2.5px minimum binds:
+  // 0.38*C + (0.14*C + 0.10*C)/2 = 0.50*C, the half-cell, identically. Below 25
+  // the minimums take over and the mark still overruns by 1.25 - 0.05*C, which
+  // is 0.05px at CELL 24 and 1.18px at the CELL 11 floor — where both minimums
+  // bind, these two constants do nothing at all, and only smaller minimums
+  // could move it. Measured on rendered pixels over a trail-grey field, since
+  // a paper halo on paper leaves nothing to measure: 22.5px before, 22.0px
+  // after, at CELL 44.
   function drawArrow() {
     var p = G.pending;
     if (!p || !p.options.length) return;
@@ -758,7 +789,7 @@ try {
     var x0 = centreX(p.cell), y0 = centreY(p.cell);
     var len = CELL * 0.38;
     var ex = x0 + DX[d] * len, ey = y0 + DY[d] * len;
-    var head = CELL * 0.22;
+    var head = CELL * 0.19;                          // 8.36px at CELL 44; see the budget above
     var bx = -DX[d] * head, by = -DY[d] * head;      // back along the shaft
     var nx = -DY[d] * head * 0.72, ny = DX[d] * head * 0.72;
     var w = Math.max(2.5, CELL * 0.14);
@@ -769,7 +800,7 @@ try {
     ctx.moveTo(ex, ey); ctx.lineTo(ex + bx + nx, ey + by + ny);
     ctx.moveTo(ex, ey); ctx.lineTo(ex + bx - nx, ey + by - ny);
     ctx.strokeStyle = PAPER;                          // halo, then the mark
-    ctx.lineWidth = w + Math.max(2.5, CELL * 0.12);
+    ctx.lineWidth = w + Math.max(2.5, CELL * 0.10);   // 22.00px painted extent at CELL 44
     ctx.stroke();
     ctx.strokeStyle = ACCENT;
     ctx.lineWidth = w;
