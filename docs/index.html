@@ -1087,13 +1087,25 @@ try {
     // one moves on runs that are nowhere near the score: the line has to say
     // which. The number itself is already on the page either way — the count
     // in the HUD, the time in the card below this one.
+    //
+    // Three words is one too many at phone width. `.big` is 1.35rem at 0.14em
+    // letterspacing, and the overlay column is clamped to 217px at a 280px
+    // viewport, so `most mazes yet` and `fastest maze yet` each came out
+    // 62px — two lines, with `yet` stranded alone on the second. Measured on
+    // the rendered card at 280/320/390/1280, one line is 37px, and of the
+    // eleven phrasings tried only those two wrap, and only at 280: `time up`,
+    // `best run yet`, `most mazes`, `fastest maze`, `best run`, `most yet`,
+    // `fastest yet`, `best yet` and `new record` are all 37px at all four
+    // widths. So the two that wrap lose their `yet` and the one that fits
+    // keeps it. What says "record" is the accent (`big new`), not the word;
+    // the announcement below still says the whole thing.
     var headline = beaten
-      ? (beat.count && beat.fast ? 'best run yet' : beat.count ? 'most mazes yet' : 'fastest maze yet')
+      ? (beat.count && beat.fast ? 'best run yet' : beat.count ? 'most mazes' : 'fastest maze')
       : 'time up';
     // The card under the headline reports *this run*, and it is written to
     // continue the headline rather than restate it. "fastest maze yet" over
     // "fastest maze 5.00s" said the same two words twice and read as a
-    // stutter; "fastest maze yet" over "in 5.00s" is one sentence. And when
+    // stutter; "fastest maze" over "in 5.00s" is one sentence. And when
     // the count is the news, the count has to be on the card: a card whose
     // only number was the fastest maze put the wrong record under the
     // headline. The standing record is on #best in both of those cases now.
