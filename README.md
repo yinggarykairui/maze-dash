@@ -14,7 +14,9 @@ As soon as it commits to one junction, an amber arrow appears on the next one. T
 
 The grey trail behind the runner is the last seven seconds of its path. It is the only record you get of where you have already been. The screenshot above is a run in progress: one maze cleared, 31.9 seconds on the clock, the trail folded back over itself where the route went wrong.
 
-Reach the ringed cell in the right-hand wall and the maze is cleared. A new one replaces it instantly. A run lasts 60 seconds. The score is how many mazes you got through. Your best score and fastest single maze are kept in `localStorage`, on your own machine. `Space`, `Enter` and a tap anywhere on the maze all do the same one thing. There is no sound.
+One strategy beats the others. Hug a wall: at every junction, take the exit that turns you the same way. The maze has no loops, so one wall runs past every cell, and that rule reaches the ring in every maze. Heading straight for the ring does not work — the direct line walks into dead ends, and it scores worse than never pressing the button. The hint under the button says this before a run and after one.
+
+Reach the ringed cell in the right-hand wall and the maze is cleared. The whole board flashes amber for about a fifth of a second, and the next maze is already drawn underneath it. There is no pause between mazes. A run lasts 60 seconds. The score is how many mazes you got through. Your best score and fastest single maze are kept in `localStorage`, on your own machine. `Space`, `Enter` and a tap anywhere on the maze all do the same one thing. There is no sound.
 
 ## How to run
 
