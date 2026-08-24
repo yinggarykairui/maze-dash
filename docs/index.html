@@ -192,7 +192,7 @@
   </div>
   <button id="act" type="button">Start run</button>
   <p id="best"></p>
-  <p id="hint">Always turn the same way. Heading straight for the ring dead-ends.</p>
+  <p id="hint">Space, Enter, tap. Keep to the exit nearest your right.</p>
   <div id="live" role="status" aria-live="polite" class="sr-only"></div>
 </main>
 <script>
@@ -257,55 +257,34 @@ try {
   try { sideCols = window.matchMedia('(orientation: landscape) and (max-height: 520px)'); }
   catch (e) { sideCols = null; }
 
-  // #hint says a different sentence on each of the three screens, and which of
-  // them is the tallest changes with the width: the strategy line is two lines
-  // at 1280 where the running line is one, and at 180 they are three lines
-  // each. Measuring the sentence that happens to be showing therefore moved the
-  // board 13px the instant you pressed Start. Reserve the tallest of the three
-  // instead, so the measurement is a property of the layout and not of the
-  // screen. Kept in one object so the copy and the reserve cannot drift apart.
+  // One sentence, and every screen shows it. It has to name the control,
+  // because the ready and over screens named none and a stranger could not
+  // start without guessing; and it has to name the rule that pays, because
+  // nothing on the board hints at it. Saying both things once is also what
+  // stops the board moving: #hint is the only thing chromePx() measures whose
+  // height depends on which screen is up, so per-screen copy makes the board a
+  // function of the wording. Three sentences meant reserving the tallest of
+  // them, and the moment one of them wrapped to a second line at a width where
+  // the others did not, every board bound by height shrank. One sentence has no
+  // tallest, nothing to reserve, and nothing that can drift.
   //
-  // The ready and over lines say the rule that pays and the trap that does
-  // not, because neither is inferable from the board. Measured through the
-  // real button at human cadence on fixed seeds: turning the same way at every
-  // junction clears 2.60 mazes a run with no zero-score runs, against 1.00 for
-  // never pressing; steering towards the ring clears 0.72, worse than never
-  // pressing, because a perfect maze is a tree and the direct line walks into
-  // dead ends. The ring is the goal and the straight line at it is the trap —
-  // say it that way round or the sentence teaches something false.
+  // The rule names its fallback ordering, because "turn the same way" names no
+  // action at the junctions where the same-way exit is not open — a third of
+  // arrivals — and a rule you cannot execute a third of the time is not a rule.
+  // "The exit nearest your right" always names exactly one: right if it is
+  // open, else straight, else left. Reverse is never an option here, so those
+  // three are the whole list.
   //
-  // The length is not free and it is spent. At 180x320 — a 360px phone at 200%
-  // zoom — the board is already at the CELL 11 floor, so every extra hint line
-  // is 16.85px straight onto the page's overflow, and the worst case there is
-  // 42px and may not grow. Three lines at that width is the whole budget, and
-  // 66 characters is what fits in three lines, which is why the press-and-tap
-  // instruction these two lines used to carry now lives only on the button
-  // ("Start run" / "Run again") and in the running line below.
-  var HINTS = {
-    ready: 'Always turn the same way. Heading straight for the ring dead-ends.',
-    running: 'Space, Enter, or tap: move the arrow to the next exit.',
-    // The same advice, and it is the same sentence: the rule does not change
-    // between the screen before a run and the screen after one, and one string
-    // is one reserve that cannot drift from the other.
-    over: 'Always turn the same way. Heading straight for the ring dead-ends.'
-  };
-  var hintReserve = 0, hintReserveW = -1;
-  function hintPx() {
-    var w = hintEl.clientWidth, h = hintEl.offsetHeight;
-    // Recomputed on a width change, and again if the live sentence ever
-    // outgrows the reserve (text-only zoom, a fallback font landing late).
-    if (w === hintReserveW && h <= hintReserve) return hintReserve;
-    var keep = hintEl.textContent, max = 0;
-    // No paint happens inside a synchronous block, so this is invisible.
-    for (var k in HINTS) {
-      hintEl.textContent = HINTS[k];
-      if (hintEl.offsetHeight > max) max = hintEl.offsetHeight;
-    }
-    hintEl.textContent = keep;
-    hintReserveW = w;
-    hintReserve = Math.max(max, h);
-    return hintReserve;
-  }
+  // Its rendered height is not free, and it was chosen by measurement, not by
+  // taste: swept against 805f36c at every viewport width from 180 to 1400 px,
+  // this sentence renders exactly as tall as that build's hint reserve at every
+  // one of them, so CELL is unchanged everywhere. Rewording it is a layout
+  // change — re-run the sweep, do not eyeball it.
+  var HINT = 'Space, Enter, tap. Keep to the exit nearest your right.';
+
+  // With one sentence there is nothing to reserve: the hint's height is just
+  // this element's height, and it cannot change without the width changing.
+  function hintPx() { return hintEl.offsetHeight; }
 
   // Everything the board is not. Measured rather than assumed: a hard-coded
   // budget does not follow the h1, HUD, button and hint when the page is
@@ -978,7 +957,6 @@ try {
       { cls: 'sub', text: 'The runner never stops. One press moves the arrow on the junction ahead to the next exit.' }
     ]);
     actBtn.textContent = 'Start run';
-    hintEl.textContent = HINTS.ready;
   }
 
   // ---- run loop ------------------------------------------------------
@@ -994,7 +972,6 @@ try {
     syncBestLine(false);
     overlay.setAttribute('hidden', '');
     actBtn.textContent = 'Turn';
-    hintEl.textContent = HINTS.running;
     announce('Run started.');
     syncHud(nowMs(), true);
   }
@@ -1010,7 +987,6 @@ try {
       { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' }
     ]);
     actBtn.textContent = 'Run again';
-    hintEl.textContent = HINTS.over;
     announce('Time up. ' + G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') + ' cleared.' +
       (fast === null ? '' : ' Fastest maze ' + fast.toFixed(1) + ' seconds.') +
       (beaten ? ' New best.' : ''));
@@ -1087,6 +1063,9 @@ try {
   newMaze();
   resetRunner();
   syncBestLine(false);
+  // The markup carries this sentence too, so the pre-script paint is not
+  // blank; writing it once from the constant is what keeps the two the same.
+  hintEl.textContent = HINT;
   showTitle();
   layoutIfNeeded();
   requestAnimationFrame(frame);
