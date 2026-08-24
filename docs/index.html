@@ -968,15 +968,18 @@ try {
     if (stored.fastest !== null && (best.fastest === null || stored.fastest < best.fastest)) {
       best.fastest = stored.fastest;
     }
-    var beaten = false;
-    if (G.cleared > best.cleared) { best.cleared = G.cleared; beaten = true; }
+    // Two records, tracked apart, because the results screen has to say which
+    // one moved: a single boolean is what let a one-maze run against a
+    // standing best of nine mazes announce "new best".
+    var beat = { count: false, fast: false };
+    if (G.cleared > best.cleared) { best.cleared = G.cleared; beat.count = true; }
     if (G.fastestThisRun !== null && (best.fastest === null || G.fastestThisRun < best.fastest)) {
       best.fastest = G.fastestThisRun;
-      beaten = true;
+      beat.fast = true;
     }
     saveBest(best);
-    syncBestLine(beaten);
-    return beaten;
+    syncBestLine(beat.count || beat.fast);
+    return beat;
   }
 
   function setOverlay(parts) {
@@ -1035,15 +1038,25 @@ try {
     G.timeLeft = 0;
     G.overAt = nowMs();
     var fast = G.fastestThisRun;
-    var beaten = onRunEnd();
+    var beat = onRunEnd();
+    var beaten = beat.count || beat.fast;
+    // The headline names the record, because "new best" did not. Mazes cleared
+    // is the score and the fastest maze is a separate record, and the fastest
+    // one moves on runs that are nowhere near the score: the line has to say
+    // which. The number itself is already on the page either way — the count
+    // in the HUD, the time in the card below this one.
+    var headline = beaten
+      ? (beat.count && beat.fast ? 'best run yet' : beat.count ? 'most mazes yet' : 'fastest maze yet')
+      : 'time up';
     setOverlay([
-      { cls: beaten ? 'big new' : 'big', text: beaten ? 'new best' : 'time up' },
+      { cls: beaten ? 'big new' : 'big', text: headline },
       { cls: 'sub', text: fast === null ? 'No maze cleared this run.' : 'fastest maze ' + fast.toFixed(2) + 's' }
     ]);
     actBtn.textContent = 'Run again';
     announce('Time up. ' + G.cleared + (G.cleared === 1 ? ' maze' : ' mazes') + ' cleared.' +
       (fast === null ? '' : ' Fastest maze ' + fast.toFixed(1) + ' seconds.') +
-      (beaten ? ' New best.' : ''));
+      (!beaten ? '' : beat.count && beat.fast ? ' Best run yet: most mazes cleared and fastest maze.'
+        : beat.count ? ' Most mazes cleared yet.' : ' Fastest maze yet.'));
     syncHud(nowMs(), true);
   }
 
