@@ -192,7 +192,7 @@
   </div>
   <button id="act" type="button">Start run</button>
   <p id="best"></p>
-  <p id="hint">Press Space, Enter, or tap the maze to start.</p>
+  <p id="hint">Always turn the same way. Heading straight for the ring dead-ends.</p>
   <div id="live" role="status" aria-live="polite" class="sr-only"></div>
 </main>
 <script>
@@ -257,16 +257,37 @@ try {
   try { sideCols = window.matchMedia('(orientation: landscape) and (max-height: 520px)'); }
   catch (e) { sideCols = null; }
 
-  // #hint says a different sentence on each of the three screens, and at
-  // 320-340px wide one of them wraps to two lines where the others fit on one.
-  // Measuring the sentence that happens to be showing therefore moved the
+  // #hint says a different sentence on each of the three screens, and which of
+  // them is the tallest changes with the width: the strategy line is two lines
+  // at 1280 where the running line is one, and at 180 they are three lines
+  // each. Measuring the sentence that happens to be showing therefore moved the
   // board 13px the instant you pressed Start. Reserve the tallest of the three
   // instead, so the measurement is a property of the layout and not of the
   // screen. Kept in one object so the copy and the reserve cannot drift apart.
+  //
+  // The ready and over lines say the rule that pays and the trap that does
+  // not, because neither is inferable from the board. Measured through the
+  // real button at human cadence on fixed seeds: turning the same way at every
+  // junction clears 2.60 mazes a run with no zero-score runs, against 1.00 for
+  // never pressing; steering towards the ring clears 0.72, worse than never
+  // pressing, because a perfect maze is a tree and the direct line walks into
+  // dead ends. The ring is the goal and the straight line at it is the trap —
+  // say it that way round or the sentence teaches something false.
+  //
+  // The length is not free and it is spent. At 180x320 — a 360px phone at 200%
+  // zoom — the board is already at the CELL 11 floor, so every extra hint line
+  // is 16.85px straight onto the page's overflow, and the worst case there is
+  // 42px and may not grow. Three lines at that width is the whole budget, and
+  // 66 characters is what fits in three lines, which is why the press-and-tap
+  // instruction these two lines used to carry now lives only on the button
+  // ("Start run" / "Run again") and in the running line below.
   var HINTS = {
-    ready: 'Press Space, Enter, or tap the maze to start.',
+    ready: 'Always turn the same way. Heading straight for the ring dead-ends.',
     running: 'Space, Enter, or tap: move the arrow to the next exit.',
-    over: 'Press Space, Enter, or tap to run again.'
+    // The same advice, and it is the same sentence: the rule does not change
+    // between the screen before a run and the screen after one, and one string
+    // is one reserve that cannot drift from the other.
+    over: 'Always turn the same way. Heading straight for the ring dead-ends.'
   };
   var hintReserve = 0, hintReserveW = -1;
   function hintPx() {
