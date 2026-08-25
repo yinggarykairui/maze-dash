@@ -1140,36 +1140,48 @@ try {
   // CELL drops at 99 of 350 pairs in each state.
   //
   // Card length is not free of *everything*, though: #overlay centres its
-  // content, so a stack taller than the board hangs off both ends and the
-  // bottom half lengthens the page. That never touches the board — CELL is
-  // identical to 805f36c everywhere either sweep looked — but it does move
-  // the page, and the sweep above stops at 320px tall, so say where the
-  // claim stops with it:
+  // content, so a stack taller than the board hangs off BOTH ends, and the
+  // two ends fail differently. The bottom half lengthens the page, and
+  // scrollHeight sees it. The top half goes above the document origin, where
+  // there is nothing to scroll up to and the card is simply gone — and
+  // scrollHeight cannot see that at all, because a page does not get longer
+  // when content leaves it at the top. So a probe built on page overflow is
+  // blind to half of this failure, and both halves are measured below. The
+  // board itself never moves either way: CELL is identical to 805f36c at
+  // every comparison in every sweep quoted here.
   //
-  //   320px tall and up   worst-case page overflow over all three screen
-  //                       states is at or under 805f36c's at every viewport
-  //                       tried, 0 of 24 pairs worse, and all eight real
-  //                       device viewports are 0 in all three states
-  //   under 320px tall    outside that sweep, and it does regress. Widths
-  //                       {1280, 900, 740, 480, 420, 360, 320, 280, 240,
-  //                       180} x heights {180, 200, 220, 240, 260, 280,
-  //                       300}: page overflow grows against 805f36c at 35 of
-  //                       those 70 pairs, worst 240x180 at 21px -> 99px, and
-  //                       nothing at 280px tall or above. CELL is unchanged
-  //                       from base at all 210 comparisons, so what regresses
-  //                       is scroll, not playfield. No real device is in
-  //                       there: 180x320 is already a 360px phone at 200%
-  //                       zoom and these are shorter still.
+  //   page overflow, 320px tall and up
+  //       worst case over all three screen states is at or under 805f36c's
+  //       at every viewport tried, 0 of 24 pairs worse.
+  //   page overflow, under 320px tall
+  //       outside the sweep above, and it does regress. Widths {1280, 900,
+  //       740, 480, 420, 360, 320, 280, 240, 180} x heights {180, 200, 220,
+  //       240, 260, 280, 300}: worse than 805f36c at 19 of those 70 pairs,
+  //       worst 240x180 at 21px -> 70px, and nothing at 240px tall or above.
+  //       CELL unchanged at all 210 comparisons, so what regresses is
+  //       scroll, not playfield.
+  //   stack top above the document origin — the half page overflow cannot see
+  //       topGap is the first card's top edge in document coordinates;
+  //       negative means unreachable. Real devices are clear: 0 of 8 portrait
+  //       viewports and 0 of 9 landscape ones go negative, thinnest at
+  //       280x653 (+121.5px) and 653x280 (+60.3px). Shorter than that it does
+  //       go negative — 6 of 8 short/narrow viewports tried, worst 360x320 at
+  //       +11.3px -> -55.0px on the results screen. 360x320 is also the case
+  //       that proves the blindness: page overflow there is 0px in *both*
+  //       builds, so an overflow probe reports no change at all while the top
+  //       of the card sits 55px off the top of the document. Measured, not
+  //       fixed — the layout stays as it is.
   //
   // The budget, so the next shift can price a rewording before making it:
   // the stack may be as tall as 404.59px at 320x320 and 436.59px at 180x320
   // before its bottom half starts lengthening the page. This screen is two
-  // cards at 338.72px, but the results screen is *three* — headline, run, and
+  // cards at 281.63px; the results screen is *three* — headline, run, and
   // this same rule card — and its tallest case ("best run yet" over "5 mazes,
-  // fastest 2.50s") is 349.69px. So the slack that binds is the results
-  // screen's: 54.91px at 320x320 and 86.91px at 180x320, a little under three
-  // lines of .sub. Lengthening either card is a layout change too, just a
-  // different one from lengthening the hint.
+  // fastest 2.50s") is 292.59px. So the slack that binds is the results
+  // screen's: 112.00px at 320x320 and 144.00px at 180x320. Lengthening either
+  // card is a layout change too, just a different one from lengthening the
+  // hint — and note that this budget prices only the bottom end. The top end
+  // is priced by topGap, and it runs out first.
   function showTitle() {
     setOverlay([
       { cls: 'sub', text: 'The runner never stops. The arrow is on the junction ahead.' },
