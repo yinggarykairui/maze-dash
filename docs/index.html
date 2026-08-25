@@ -1115,11 +1115,18 @@ try {
   }
 
   // Each screen says its own thing once. The title is in the h1, the record is
-  // in #best, the score is in #hud, and the hint under the button says what
-  // the button will actually do — on all three screens, this one included,
-  // which is why this card no longer says it too. What is left here is the
-  // one fact no other surface carries: the arrow is not on the runner, it is
-  // on a junction the runner has not reached yet (a median 5 cells off).
+  // in #best, the score is in #hud, and the hint under the button names the
+  // keys — the same sentence on all three screens, this one included, which
+  // is why this card no longer names them too. What that sentence describes
+  // is the *running* screen's action, not the button's: here and on the
+  // results screen the button starts or restarts a run instead, so on two
+  // screens of the three the hint is not a caption for the control beside it.
+  // It is one line with one height budget and three screens to serve; naming
+  // the keys is the part that is true on all three.
+  //
+  // What is left on this card is the one fact no other surface carries: the
+  // arrow is not on the runner, it is on a junction the runner has not
+  // reached yet (a median 5 cells off).
   //
   // The rule gets a card of its own rather than a clause bolted to the
   // sentence above it. Cards cost no board pixels — #overlay is absolutely
