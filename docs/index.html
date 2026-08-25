@@ -329,6 +329,23 @@ try {
   // Everything the board is not. Measured rather than assumed: a hard-coded
   // budget does not follow the h1, HUD, button and hint when the page is
   // zoomed, and it was the reason 200% zoom made the playfield *smaller*.
+  //
+  // #hint is not the only height in here that depends on which screen is up,
+  // and an earlier version of this file said it was. bestEl is in this list
+  // too, and syncBestLine() blanks it on the results of a run that beat both
+  // halves of the record; narrow enough, a real record wraps to two lines, so
+  // #best.offsetHeight goes 32 to 16 and the board grows a cell between the
+  // ready screen and that results screen. Measured after the syncBestLine fix
+  // with a stored record of 2 mazes / 6.00s and a 5-maze / 2.50s run, widths
+  // {180, 200, 220, 240, 260} x heights {320, 360, 400, 440, 480, 520, 560,
+  // 600, 640, 700}: 5 of those 50 pairs move (200x360, 220x360, 220x400,
+  // 240x360, 240x400), all of them upward, all of them 180-260px wide. The
+  // same probe on the results of a run that beat only one half moves 0 of 50,
+  // and at c24e510 — where either half blanked the line — it moved 5 of 50 in
+  // each of those two cases as well. Pre-existing in 805f36c and not fixed
+  // here; recorded so the claim in this file is the one the pixels support.
+  // Which pairs move depends on how wide the stored record renders, so quote
+  // the record with the count.
   function chromePx() {
     if (sideCols && sideCols.matches) return PAD;   // it is beside the board, not above it
     var els = [h1El, hudEl, actBtn, bestEl];
@@ -641,12 +658,20 @@ try {
   // rule.
   // 0.14 is the peak, and it is bounded on both sides. Every number below is a
   // rendered pixel, not an intention: sampled with getImageData on a 600x600
-  // viewport at dpr 1 (CELL 31), over the 3,000 board pixels that are still
-  // exactly paper three frames after the wash has gone, on the clearing frame
-  // itself — the frame where drawFlash clamps a negative age to full strength.
+  // viewport at dpr 1 (CELL 31, backing store 405x405 = 164,025 px), over the
+  // board pixels that are still exactly paper three frames after the wash has
+  // gone, read on the clearing frame itself — the frame where drawFlash
+  // clamps a negative age to full strength. That set is nearly the whole
+  // board rather than a corner of it, and its size moves with the maze, so
+  // here is what it was counted over: seeds 1000-1011, one forced clear each,
+  // 148,069 to 151,086 pixels, 150,631 on average. This comment used to call
+  // it 3,000, which is fiftyfold out and was the one number in this block
+  // that did not reproduce.
   // Below 0.14 the wash stops being visible: over paper (250,248,244) the
   // accent's (176,67,12) moves the blue channel 232 at full strength, so 0.14
-  // moves it 32.5 and the board renders (239,222,211) — 33 off on blue. Above
+  // moves it 32.5 and the board renders (239,222,211) — 33 off on blue, and
+  // that exact triple is what 147,533 to 150,870 of those pixels come out as,
+  // 99.64% to 99.86% of the set in every one of the twelve seeds. Above
   // it the walls start to go: a wall stroke is INK at 0.9, and renders
   // (49,49,48) on paper, 12.277:1; washed at 0.14 it renders (67,51,43)
   // against washed paper, still 9.192:1. Half the blue is back by the frame at
@@ -1040,8 +1065,14 @@ try {
   //
   // The rule gets a card of its own rather than a clause bolted to the
   // sentence above it. Cards cost no board pixels — #overlay is absolutely
-  // positioned and never feeds hintPx(), measured over 350 (width, height)
-  // pairs in each of two screen states; see the RULE comment.
+  // positioned and never feeds hintPx(). Measured, not assumed, and the
+  // pairs are named so the next shift can re-run it: widths {1280, 900, 740,
+  // 480, 412, 390, 360, 320, 280, 180} x heights 320 to 1000 step 20, 350
+  // pairs, in the ready state and again after Start, one cold page load per
+  // pair, this build against the same build with this card deleted. CELL
+  // differs at 0 of 700 comparisons. The control that makes that non-vacuous
+  // is the same sweep with this same string appended to #hint instead, where
+  // CELL drops at 99 of 350 pairs in each state.
   //
   // Card length is not free of *everything*, though: #overlay centres its
   // content, so a stack taller than the board hangs off both ends and the
