@@ -732,17 +732,22 @@ try {
   // 99.638% to 99.860% of the set in every one of the twelve seeds. Above
   // it the walls start to go: a wall stroke is INK at 0.9, and renders
   // (49,49,48) on paper, 12.277:1; washed at 0.14 it renders (67,51,43)
-  // against washed paper, still 9.192:1. Half the blue is back by the frame at
-  // 65ms and the board is exactly (250,248,244) again by the frame at 182ms,
-  // inside the 200ms the falloff nominally runs for and before the runner has
-  // crossed 1.1 cells at SPEED 5.5.
+  // against washed paper, still 9.192:1. The decay, counted in frames on the
+  // same fixed 16.667ms grid this block is pinned to, with the clearing frame
+  // as frame 0 — the old "65ms" and "182ms" are not frames on that grid and
+  // neither exists: half the blue is back at frame 4, age 66.668ms, and the
+  // sample set's mean blue is 243.98 of 244 by frame 11, age 183.337ms. Every
+  // pixel of it is exactly (250,248,244) from frame 12, age 200.004ms, which
+  // is the first frame drawFlash draws nothing on at all. So the visible fade
+  // is over inside the 200ms the falloff nominally runs for, and before the
+  // runner has crossed 1.1 cells at SPEED 5.5.
   // Drawn under the tether, arrow and runner on purpose: the accent is the
   // runner's own hue, and a wash laid over the two amber marks would tint them
   // towards the paper they are meant to stand out from. Under them, they are
   // untouched — the board moves and the marks do not.
   // reduceMotion does not fork here, and that is derived rather than asserted.
   // Rate: a clear cannot come faster than MIN_MAZE_SECONDS = (COLS-1)/SPEED =
-  // 2.1818s apart, so the wash tops out at 0.458 Hz — an order of magnitude
+  // 2.1818s apart, so the wash tops out at 0.4583 Hz — 3 / 0.4583 = 6.5x
   // under the 3 Hz general-flash threshold, and that is the ceiling, not an
   // average. Depth: the step is (250,248,244) -> (239,222,211), L* 97.63 ->
   // 89.53, delta-L* 8.1 over 200ms. A colour that fades by eight L* points at
@@ -827,10 +832,14 @@ try {
 
   // The corridor from the runner to the junction the arrow is standing on.
   // Without it the arrow is a mark with walls in between and nothing saying
-  // which question it is answering, and the corridor between them is long: over
-  // 21,581 sampled frames the path ran to 57 cells at the 99th percentile and
-  // 76 at the longest. There are no choices anywhere along this stretch — it is
-  // the route the runner takes on its own — so it tells the player nothing they
+  // which question it is answering, and the corridor between them is long.
+  // How long is a property of the policy steering the walk, not of the board,
+  // so the policy is named: hands-off, never pressing, seeds 1000-1009, one
+  // cold page per run, 60-second runs on a fixed 16.667ms clock — 36,000
+  // frames stepped, 35,040 of them carrying a pending path. Over those the
+  // path ran to a median of 4 cells, 52 at the 99th percentile and 64 at the
+  // longest. There are no choices anywhere along this stretch — it is the
+  // route the runner takes on its own — so it tells the player nothing they
   // could not already work out.
   function drawTether() {
     var p = G.pending;
@@ -838,8 +847,12 @@ try {
     // A junction one cell away needs no tether: there is nothing between the
     // runner and the arrow to be ambiguous about, and a dashed line across
     // that gap is exactly what welded the two amber marks into one glyph with
-    // a tail. 17% of sampled frames are at that distance — common, not the
-    // majority the 35% this line used to claim would have made it.
+    // a tail. Common, but not the majority the 35% this line once claimed
+    // would have made it: over the hands-off sample named above, the junction
+    // is one cell away on 5,646 of the 35,040 frames that have a pending
+    // path — 16.1%. Counted the other way, as frames on which this function
+    // draws nothing, add the 960 frames with no pending junction at all and
+    // it is 6,606 of 36,000, 18.4%. Two different denominators, so say which.
     if (p.path.length <= 1) return;
     // 0.45 put the dashes at rgb(217,167,140) = 2.02:1 on paper, which at CELL
     // 25 and below is a rumour rather than a line, and this line is the whole
@@ -1126,7 +1139,8 @@ try {
   //
   // What is left on this card is the one fact no other surface carries: the
   // arrow is not on the runner, it is on a junction the runner has not
-  // reached yet (a median 5 cells off).
+  // reached yet — a median 4 cells off under hands-off play, and the policy
+  // matters to that number; see the sample named in drawTether.
   //
   // The rule gets a card of its own rather than a clause bolted to the
   // sentence above it. Cards cost no board pixels — #overlay is absolutely
