@@ -303,10 +303,13 @@ try {
   // tether's last segment when the junction is more than one cell off, and
   // the runner's own motion when it is not.
   //
-  // The fallback stops at straight on purpose. "else left" was measured, not
-  // assumed, and it never fires: a junction offers at least two of {straight,
-  // right, left}, so if right is shut straight is open. 0 of 18,539 junction
-  // arrivals sampled across the 300 bot runs below had neither.
+  // The fallback stops at "the one ahead" on purpose, and it needs no "else
+  // left" because that branch cannot be reached. That is a theorem, not a
+  // sample: reverse is excluded, so a junction is a cell with at least two of
+  // {straight, right, left} open, and right being shut therefore leaves
+  // straight open. The bots corroborate it — 0 of 30,876 junction arrivals
+  // over all 480 runs behind this comment — but the proof is what makes it
+  // safe to leave the clause out, and it is stronger than any n.
   //
   // Sentence two says "for the ring", not "straight for the ring", and the
   // missing word is deliberate. Sentence one already spends "ahead" on the
@@ -341,6 +344,12 @@ try {
   //   hands-off, never pressing          1.050 mazes/run   19 of 60 scoreless
   //   the reader's right = screen-east   0.217 mazes/run   48 of 60 scoreless
   //   straight at the ring               0.150 mazes/run   51 of 60 scoreless
+  //
+  // Those four rows are 4 x 60 = 240 runs and 15,635 junction arrivals. The
+  // screen-east row does not reproduce without its tie-break stated — three
+  // defensible guesses at what that bot does when east is shut span 0.217 to
+  // 0.800 — so: it takes the east exit when east is open, and otherwise
+  // o[0], which optionsAt orders as the exit closest to straight ahead.
   //
   // The rule is the only one of the four that never scores zero, which is the
   // point: a perfect maze is a tree, so one wall runs past every cell. The
@@ -687,21 +696,33 @@ try {
   // it borrows nothing from the accent's "you, and the choice in front of you"
   // rule.
   // 0.14 is the peak, and it is bounded on both sides. Every number below is a
-  // rendered pixel, not an intention: sampled with getImageData on a 600x600
-  // viewport at dpr 1 (CELL 31, backing store 405x405 = 164,025 px), over the
-  // board pixels that are still exactly paper three frames after the wash has
-  // gone, read on the clearing frame itself — the frame where drawFlash
-  // clamps a negative age to full strength. That set is nearly the whole
-  // board rather than a corner of it, and its size moves with the maze, so
-  // here is what it was counted over: seeds 1000-1011, one forced clear each,
-  // 148,069 to 151,086 pixels, 150,631 on average. This comment used to call
-  // it 3,000, which is fiftyfold out and was the one number in this block
-  // that did not reproduce.
+  // rendered pixel, not an intention, and the frames they are read on are
+  // pinned: "three frames after the wash has gone" does not say which frame
+  // is frame zero, and the interval does not reproduce without it.
+  //
+  //   clock            fake, stepped at a fixed 16.667ms per frame
+  //   clearing frame   the frame G.cleared increments on; drawFlash clamps
+  //                    its negative age to full strength, so it is the peak,
+  //                    and it is where the colours below are read
+  //   frame 0          the first frame whose timestamp puts now - G.flashAt
+  //                    at or past FLASH_MS — the first frame with no wash at
+  //                    all. On this clock it lands at age 200.004ms.
+  //   the set          the board pixels that are exactly paper (250,248,244)
+  //                    three frames after frame 0, i.e. on frame 3, age
+  //                    250.005ms
+  //
+  // Geometry: getImageData on a 600x600 viewport at dpr 1, CELL 31, backing
+  // store 405x405 = 164,025 px. The set is nearly the whole board rather than
+  // a corner of it, and its size moves with the maze, so here is what it was
+  // counted over: seeds 1000-1011, one forced clear each, 148,069 to 151,086
+  // pixels, 150,631 on average. This comment used to call it 3,000, which is
+  // fiftyfold out and was the one number in this block that did not
+  // reproduce.
   // Below 0.14 the wash stops being visible: over paper (250,248,244) the
   // accent's (176,67,12) moves the blue channel 232 at full strength, so 0.14
   // moves it 32.5 and the board renders (239,222,211) — 33 off on blue, and
   // that exact triple is what 147,533 to 150,870 of those pixels come out as,
-  // 99.64% to 99.86% of the set in every one of the twelve seeds. Above
+  // 99.638% to 99.860% of the set in every one of the twelve seeds. Above
   // it the walls start to go: a wall stroke is INK at 0.9, and renders
   // (49,49,48) on paper, 12.277:1; washed at 0.14 it renders (67,51,43)
   // against washed paper, still 9.192:1. Half the blue is back by the frame at
