@@ -170,6 +170,17 @@
   #act:hover { background: rgba(27, 27, 27, 0.05); }
   #act:active { background: rgba(27, 27, 27, 0.14); }
   #act:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  /* For the first second after the buzzer the button drops every press, and
+     it used to go on painting like one that works: full opacity, a pointer
+     cursor, live :hover and :active. A deliberate click at ~700ms was
+     answered by the one piece of feedback that means "that worked". This is
+     aria-disabled and not disabled: the button is still the thing you are
+     about to press and must keep its place in the tab order and its focus
+     ring. press() is what actually drops the press; this only stops the page
+     claiming otherwise. */
+  #act[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+  #act[aria-disabled="true"]:hover,
+  #act[aria-disabled="true"]:active { background: transparent; }
   .sr-only {
     position: absolute;
     width: 1px; height: 1px;
@@ -1227,6 +1238,18 @@ try {
   // ---- frame loop ----------------------------------------------------
   var last = 0;
 
+  // Driven off the same clock press() tests, in the frame loop rather than a
+  // timer, so the moment the button starts answering is the moment it starts
+  // looking like it will.
+  var actGuarded = false;
+  function syncActGuard(now) {
+    var guarded = G.state === 'over' && now - G.overAt < RESTART_GUARD_MS;
+    if (guarded === actGuarded) return;
+    actGuarded = guarded;
+    if (guarded) actBtn.setAttribute('aria-disabled', 'true');
+    else actBtn.removeAttribute('aria-disabled');
+  }
+
   function frame(now) {
     requestAnimationFrame(frame);
     layoutIfNeeded();
@@ -1239,6 +1262,7 @@ try {
     if (G.state === 'running') update(dt);
     draw(now);
     syncHud(now, false);
+    syncActGuard(now);
   }
 
   newMaze();
