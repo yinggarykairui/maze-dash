@@ -311,24 +311,31 @@ try {
   // over all 480 runs behind this comment — but the proof is what makes it
   // safe to leave the clause out, and it is stronger than any n.
   //
-  // Sentence two says "for the ring", not "straight for the ring", and the
-  // missing word is deliberate. Sentence one already spends "ahead" on the
-  // fallback exit; a second sentence naming "straight" as the thing to avoid
-  // reads, on a scan, as "do not take the straight exit" and inverts the
-  // fallback to left. Measured on the harness below: that reading is 0.267
-  // mazes/run, 48 of 60 scoreless, against hands-off's 1.050 — the same
-  // "the screen punishes attention" shape this card exists to end.
+  // There is no second sentence naming the trap, and that is a scope-out
+  // under MANUAL 7.4, not an oversight. Three cycles of copy have now tried
+  // to put the trap on this surface and all three shipped a misreading a
+  // stranger acts on: cycle 0's sentence read as "avoid the ring", cycle 1's
+  // "your right" read as the reader's right, and cycle 3's "Steering for the
+  // ring dead-ends" reads as "avoid the ring" again — because nothing on any
+  // screen ever says the ring is the goal. Base never used the word "ring" in
+  // player copy at all, so the card was the first place a player met it, and
+  // it met it as a thing to steer away from. That reading is measured below
+  // at 0.000 mazes/run, 60 of 60 scoreless: the only policy of the nine that
+  // never scores at all. 7.4 says a defect that survives two cycles is
+  // removed rather than re-worded, and a deletion is the only edit here that
+  // cannot ship a fourth misreading. The trap stays in the README, which has
+  // room for the sentence that makes it make sense — that the ring is what
+  // you are trying to reach. Putting the ring on screen is the next
+  // increment's problem, not another rewording of this line.
   //
-  // Deleting a word is not proof, so every misreading of the new sentence
-  // that could be constructed was raced too, same protocol, same seeds, 60
-  // runs each. All of them lose to doing nothing: right-then-left 0.267 (48
-  // scoreless), the reader's-right readings 0.217 (48) and, with "ahead" also
-  // read as up the screen, 0.250 (49); "right" kept in the runner's frame but
-  // "ahead" read as up the screen 0.600 (33); "keep away from the ring",
-  // which is how cycle 0's trap sentence was misread, 0.000 (60 of 60). So
-  // this sentence is not misreading-proof and no wording here should be
-  // assumed to be. What it is, is a sentence whose *literal* reading is the
-  // winning policy and the only one of the eight with no scoreless run.
+  // What is left is one sentence, and every misreading of it that could be
+  // constructed was raced: same protocol, same seeds, 60 runs each, and all
+  // of them lose to doing nothing. Right-then-left 0.267 (48 scoreless), the
+  // reader's-right readings 0.217 (48) and 0.250 (49), "ahead" read as up the
+  // screen 0.600 (33) — against hands-off's 1.050. So this line is not
+  // misreading-proof and no wording here should be assumed to be. What it is,
+  // is a sentence whose *literal* reading is the winning policy and the only
+  // one measured with no scoreless run.
   //
   // That this is the rule that pays is measured too. Protocol, because three
   // harnesses disagreed until they matched it: one fresh page per run with
@@ -359,7 +366,7 @@ try {
   // day-013 table (2.60 / 1.00 / 0.72, real keys at human cadence) is a
   // different measurement of the same ordering, not this one; do not quote
   // its figures as if they came from here.
-  var RULE = "At each junction take the exit on the runner's right as it arrives, or the one ahead if there is none. Steering for the ring dead-ends.";
+  var RULE = "At each junction take the exit on the runner's right as it arrives, or the one ahead if there is none.";
 
   // With one sentence there is nothing to reserve: the hint's height is just
   // this element's height, and it cannot change without the width changing.
