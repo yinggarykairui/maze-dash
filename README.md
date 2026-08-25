@@ -8,7 +8,11 @@ A one-button maze runner: the runner never stops, and the only thing you do is c
 
 ## What it does
 
-The runner never stops: it moves at a fixed speed, takes forced turns and reverses out of dead ends by itself, and the grey trail it leaves is the last seven seconds of its path — the only record you get of where you have already been. It needs you only at a junction, where an amber arrow marks the exit it will take, one press (`Space`, `Enter` or a tap) moves that arrow to the next exit, and a dashed line links the arrow back to the runner when that junction is more than one cell ahead. One rule beats the rest, and the hint under the button carries it: at every junction take the exit nearest your right — right if there is one, else straight, else left. That rule always reaches the ringed cell that clears the maze, because the maze has no loops and one wall runs past every cell; heading straight for the ring is the trap, since the direct line walks into dead ends and scores worse than never pressing at all. A run lasts 60 seconds and the score is how many mazes you cleared: each clear warms the whole board towards amber for about a fifth of a second, the next maze is already drawn underneath it, and your best score and fastest single maze are kept in `localStorage` on your own machine.
+The runner moves at a fixed speed and never stops. It takes forced turns and reverses out of dead ends by itself. It needs you only at junctions. An amber arrow on the junction ahead marks the exit it will take. One press (`Space`, `Enter` or a tap) moves it to the next exit. A dashed line links a distant arrow to the runner. The grey trail is the last seven seconds of its path, the only record of where you have been.
+
+One rule beats the rest. At each junction, take the exit on the runner's right as it arrives; if there is none, take the one ahead. That always reaches the ringed cell: the maze has no loops and one wall runs past every cell. Steering straight for the ring is the trap: it walks into dead ends and scores worse than never pressing. Both are on a card on the title and results screens. The hint under the button carries the control, on all three screens.
+
+Reach the ring and the maze is cleared. The board warms towards amber for a fifth of a second, over the next maze already drawn underneath. A run lasts 60 seconds; the score is how many mazes you cleared. Your best score and fastest maze are kept in `localStorage` on your own machine. There is no sound.
 
 ## How to run
 
