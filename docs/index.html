@@ -366,7 +366,14 @@ try {
   // day-013 table (2.60 / 1.00 / 0.72, real keys at human cadence) is a
   // different measurement of the same ordering, not this one; do not quote
   // its figures as if they came from here.
-  var RULE = "At each junction take the exit on the runner's right as it arrives, or the one ahead if there is none.";
+  // The positive the three trap-wording cycles never supplied (#89 item 1):
+  // the ringed cell is the goal, said in player copy where before the word
+  // "ring" lived only in a comment. It leads the card so it rides to both the
+  // title and results screens, and the measured-optimal rule sentence after it
+  // is unchanged (it scores 1.833, the best of nine policies — not retuned).
+  // "the runner's right" is now readable off the board, because drawRunner
+  // gives the runner a visible facing (below).
+  var RULE = "Reach the ringed cell. At each junction take the exit on the runner's right as it arrives, or the one ahead if there is none.";
 
   // With one sentence there is nothing to reserve: the hint's height is just
   // this element's height, and it cannot change without the width changing.
@@ -956,15 +963,43 @@ try {
   // the runner keeps its full radius. A 1px ring was enough against paper and
   // not enough against a trail the runner is by definition standing on: the
   // ring is what separates the two amber marks when the arrow is next door.
+  // The runner was one arc() with no facing, so the winning rule — "the exit on
+  // the runner's right" — could only be read off the trail's last segment
+  // (#89 item 1: a chirality rule stated in words for an orientation-free
+  // token loses to not playing under every misreading). It now carries a nose:
+  // a short triangle pointing along r.heading, which arrive() sets to the
+  // direction of the current from->to move. Same two-colour construction as the
+  // disc and the arrow — a paper halo stroked first so it sits outside the
+  // mark, then the accent fill — so the nose separates from the trail the
+  // runner stands on and from the walls, and adds no colour. The disc keeps its
+  // full radius; the nose only extends the leading edge.
   function drawRunner() {
     var x = runnerX(), y = runnerY(), r = Math.max(2, CELL * 0.2);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    var d = G.runner.heading, dx = DX[d], dy = DY[d];
+    var nx = -dy, ny = dx;                 // unit perpendicular to the heading
+    var tip = r * 2.15, half = r * 0.82;   // apex reach and half-base of the nose
+    var bx = x + dx * (r * 0.1), by = y + dy * (r * 0.1);  // base just past centre
+    function nosePath() {
+      ctx.beginPath();
+      ctx.moveTo(x + dx * tip, y + dy * tip);
+      ctx.lineTo(bx + nx * half, by + ny * half);
+      ctx.lineTo(bx - nx * half, by - ny * half);
+      ctx.closePath();
+    }
+    function discPath() {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+    }
+    // paper halo on both shapes first (stroke sits outside the fill)
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.strokeStyle = PAPER;
     ctx.lineWidth = Math.max(2, CELL * 0.11);
-    ctx.stroke();
+    nosePath(); ctx.stroke();
+    discPath(); ctx.stroke();
+    // then the accent fill, nose and disc as one amber token
     ctx.fillStyle = ACCENT;
-    ctx.fill();
+    nosePath(); ctx.fill();
+    discPath(); ctx.fill();
   }
 
   function draw(now) {
